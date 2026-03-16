@@ -209,10 +209,6 @@ select {
 }
 
 .botao-mapa {
-  position: absolute;
-  right: 14px;
-  top: 14px;
-  z-index: 3;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.92);
   border-radius: 999px;
@@ -221,7 +217,129 @@ select {
   cursor: pointer;
 }
 
+.map-controls {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 8px;
+  align-items: center;
+  justify-items: center;
+}
+
+.map-controls .botao-mapa {
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0 10px;
+  font-weight: 700;
+}
+
+.map-controls .botao-mapa.destaque {
+  grid-column: span 3;
+  min-width: 96px;
+}
+
+.tabela-cenario-wrap {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.tabela-cenario-toolbar {
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.campo-busca-tabela {
+  min-width: min(100%, 420px);
+}
+
+.campo-busca-tabela input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(24, 36, 31, 0.14);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 11px 12px;
+  color: var(--ink);
+  font: inherit;
+}
+
+.paginacao-tabela {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.paginacao-tabela .botao-mapa[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tabela-cenario {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.tabela-cenario th,
+.tabela-cenario td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tabela-cenario thead th,
+.tabela-cenario tfoot th {
+  background: #f4efe5;
+}
+
+.tabela-cenario thead th {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.botao-ordenacao-tabela {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tabela-cenario tfoot th {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.tabela-cenario tbody tr:nth-child(even) {
+  background: rgba(29, 107, 82, 0.035);
+}
+
 #mapa-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+#mapa-clima-svg,
+#mapa-programa-svg {
   width: 100%;
   height: auto;
   display: block;
@@ -264,6 +382,10 @@ select {
 }
 
 .map-frame-clima {
+  min-height: 420px;
+}
+
+.map-frame-programa {
   min-height: 420px;
 }
 
@@ -671,5 +793,16 @@ select {
   .cartilha-meta {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .map-controls {
+    right: 10px;
+    top: 10px;
+    gap: 6px;
+  }
+
+  .map-controls .botao-mapa {
+    min-width: 38px;
+    min-height: 38px;
   }
 }

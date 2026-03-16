@@ -124,6 +124,26 @@ const definicoesMetricas = {
     paleta: ["#ece6b7", "#b7a72d", "#6f631b"],
     formatador: (valor) => formatarInteiro(valor),
   },
+  ifdm_geral: {
+    rotulo: "IFDM Geral",
+    tipo: "numerica",
+    rotuloDetalhe: "IFDM Geral",
+    fonte: {
+      arquivo: "Ranking-IFDM-2025-ano-base-2023.xlsx",
+      aba: "IFDM Geral",
+      origem: "Ranking oficial da FIRJAN",
+    },
+    descricao:
+      "Índice FIRJAN de Desenvolvimento Municipal para o ano-base 2023, combinando emprego e renda, educação e saúde.",
+    criterios:
+      "O painel usa o ranking oficial da FIRJAN e associa cada município por nome e UF à malha municipal e à base fiscal do dashboard.",
+    interpretacao:
+      "Valores maiores indicam melhor desenvolvimento relativo segundo a metodologia do IFDM. O índice deve ser lido em conjunto com autonomia fiscal e dependência.",
+    detalhe:
+      "O detalhe mostra o IFDM geral e seus componentes para conectar desenvolvimento municipal com sustentabilidade fiscal e social.",
+    paleta: ["#edf3dd", "#9bc36b", "#3d6c29"],
+    formatador: (valor) => formatarNumero(valor, 3),
+  },
 };
 
 const explicacoesCampos = {
@@ -177,6 +197,12 @@ const explicacoesCampos = {
   "Mulheres no trabalho formal": "Participação feminina em trabalhos formais segundo a base enriquecida.",
   "Tem RGF": "Sinalização binária presente na planilha sobre disponibilidade de relatório fiscal.",
   "Avisos da base": "Observações e alertas trazidos pela própria planilha consolidada.",
+  "IFDM Geral": "Índice FIRJAN de Desenvolvimento Municipal, com base oficial da FIRJAN para o ano-base 2023.",
+  "IFDM Educação": "Componente do IFDM relacionado a desempenho educacional.",
+  "IFDM Saúde": "Componente do IFDM relacionado a saúde.",
+  "IFDM Emprego & renda": "Componente do IFDM relacionado a mercado de trabalho e renda.",
+  "Ranking IFDM nacional": "Posição do município no ranking nacional do IFDM oficial da FIRJAN.",
+  "Ranking IFDM estadual": "Posição do município no ranking estadual do IFDM oficial da FIRJAN.",
 };
 
 const elementos = {
@@ -191,7 +217,10 @@ const elementos = {
   resetarMapa: document.getElementById("resetar-mapa"),
   mapa: document.getElementById("mapa-svg"),
   mapaClima: document.getElementById("mapa-clima-svg"),
+  mapaPrograma: document.getElementById("mapa-programa-svg"),
   tooltip: document.getElementById("tooltip-mapa"),
+  tooltipClima: document.getElementById("tooltip-clima"),
+  tooltipPrograma: document.getElementById("tooltip-programa"),
   tooltipAjuda: document.getElementById("tooltip-ajuda"),
   tituloDetalhe: document.getElementById("titulo-detalhe"),
   subtituloDetalhe: document.getElementById("subtitulo-detalhe"),
@@ -245,12 +274,26 @@ const elementos = {
   programaMensagem: document.getElementById("programa-mensagem"),
   programaParametro: document.getElementById("programa-parametro"),
   programaIfdm: document.getElementById("programa-ifdm"),
+  programaPosUnificacao: document.getElementById("programa-pos-unificacao"),
   programaLrg: document.getElementById("programa-lrg"),
   programaEixos: document.getElementById("programa-eixos"),
   programaMetodologia: document.getElementById("programa-metodologia"),
   programaTerritorios: document.getElementById("programa-territorios"),
+  programaMapaResumo: document.getElementById("programa-mapa-resumo"),
+  programaMapaAviso: document.getElementById("programa-mapa-aviso"),
+  programaBuscaTerritorios: document.getElementById("programa-busca-territorios"),
+  programaOrdenarTerritorio: document.getElementById("programa-ordenar-territorio"),
+  programaOrdenarUf: document.getElementById("programa-ordenar-uf"),
+  programaOrdenarPopulacao: document.getElementById("programa-ordenar-populacao"),
+  programaTabelaTerritorios: document.getElementById("programa-tabela-territorios"),
+  programaTabelaTotalBrasil: document.getElementById("programa-tabela-total-brasil"),
+  programaPaginaAnterior: document.getElementById("programa-pagina-anterior"),
+  programaPaginaProxima: document.getElementById("programa-pagina-proxima"),
+  programaPaginacaoResumo: document.getElementById("programa-paginacao-resumo"),
+  programaCenariosAviso: document.getElementById("programa-cenarios-aviso"),
   programaCenarios: document.getElementById("programa-cenarios"),
   programaLegal: document.getElementById("programa-legal"),
+  programaCapitaisIfdm: document.getElementById("programa-capitais-ifdm"),
   programaLrgPrincipios: document.getElementById("programa-lrg-principios"),
 };
 
@@ -269,7 +312,15 @@ const estado = {
   climaVariavelAtual: "precipitacao",
   climaUfAtual: "BRASIL",
   codigoSelecionado: null,
-  mapaTransform: { escala: 1, x: 0, y: 0 },
+  buscaTerritoriosPrograma: "",
+  paginaTerritoriosPrograma: 1,
+  itensPorPaginaTerritoriosPrograma: 15,
+  ordenacaoTerritoriosPrograma: { chave: "nome", direcao: "asc" },
+  mapaTransforms: {
+    principal: { escala: 1, x: 0, y: 0 },
+    clima: { escala: 1, x: 0, y: 0 },
+    programa: { escala: 1, x: 0, y: 0 },
+  },
 };
 
 inicializar().catch((erro) => {
@@ -310,7 +361,11 @@ async function buscarJson(url) {
 }
 
 function prepararMapa() {
-  estado.mapaTransform = { escala: 1, x: 0, y: 0 };
+  estado.mapaTransforms = {
+    principal: { escala: 1, x: 0, y: 0 },
+    clima: { escala: 1, x: 0, y: 0 },
+    programa: { escala: 1, x: 0, y: 0 },
+  };
 }
 
 function preencherResumo() {
@@ -363,15 +418,29 @@ function renderizarProgramaReforma() {
     programa.territorios_identidade.parametro_populacional_otimo
   )} habitantes e possibilidade de recalibração.`;
   elementos.programaIfdm.textContent = `${programa.visao_geral.ifdm.status.replaceAll("_", " ")}. ${programa.visao_geral.ifdm.observacao}`;
+  elementos.programaPosUnificacao.textContent = `${formatarInteiro(programa.mapa_unificado.municipios_depois)} territórios no cenário simulado, ante ${formatarInteiro(
+    programa.mapa_unificado.municipios_antes
+  )} municípios atuais.`;
   elementos.programaLrg.textContent = `${programa.lrg_conceitual.status.replaceAll("_", " ")}. ${programa.lrg_conceitual.aviso}`;
+  elementos.programaMapaResumo.textContent = `Após a unificação preliminar, o cenário passa de ${formatarInteiro(
+    programa.mapa_unificado.municipios_antes
+  )} para ${formatarInteiro(programa.mapa_unificado.municipios_depois)} unidades territoriais, redução de ${formatarInteiro(
+    programa.mapa_unificado.reducao_absoluta
+  )} (${formatarNumero(programa.mapa_unificado.reducao_percentual, 1)}%).`;
+  elementos.programaMapaAviso.textContent = programa.mapa_unificado.escopo;
+  elementos.programaCenariosAviso.textContent = programa.cenarios_amalgama.observacao_metodologica;
 
   preencherLista(elementos.programaEixos, programa.visao_geral.eixos);
   preencherLista(elementos.programaMetodologia, programa.territorios_identidade.metodologia);
   preencherLista(elementos.programaLrgPrincipios, programa.lrg_conceitual.principios_sugeridos);
 
   renderizarTerritoriosPrograma(programa.territorios_identidade.territorios);
+  renderizarMapaUnificadoPrograma(programa.mapa_unificado.territorios);
+  sincronizarControlesTabelaPrograma();
+  renderizarTabelaMapaUnificado(programa.mapa_unificado.territorios);
   renderizarCenariosPrograma(programa.cenarios_amalgama.municipios_prioritarios);
   renderizarArquiteturaLegal(programa.arquitetura_legal.eixos);
+  renderizarCapitaisIfdm(programa.ifdm_capitais || []);
 }
 
 function preencherCardCartilha(cartilha, elementosCard) {
@@ -419,10 +488,10 @@ function renderizarTerritoriosPrograma(territorios) {
       card.innerHTML = `
         <span>${territorio.nome}</span>
         <strong>${formatarInteiro(territorio.populacao_total)} hab. · ${territorio.quantidade_municipios} municípios</strong>
-        <small>Autonomia média: ${formatarNumero(territorio.autonomia_media, 2)} · Dependência média: ${formatarNumero(
+      <small>Autonomia média: ${formatarNumero(territorio.autonomia_media, 2)} · Dependência média: ${formatarNumero(
           territorio.dependencia_media,
           1
-        )}% · Status predominante: ${territorio.status_predominante}</small>
+        )}% · IFDM médio: ${formatarNumero(territorio.ifdm_medio, 3)} · Status predominante: ${territorio.status_predominante}</small>
         <small>Municípios: ${nomesMunicipios || "Sem detalhamento nominal disponível."}</small>
       `;
       elementos.programaTerritorios.appendChild(card);
@@ -440,9 +509,89 @@ function renderizarCenariosPrograma(municipios) {
       <small>População: ${formatarInteiro(item.populacao)} · Dependência: ${formatarNumero(
         item.pct_dependencia_transf,
         1
-      )}% · Autonomia: ${formatarNumero(item.autonomia_fiscal, 2)}</small>
+      )}% · Autonomia: ${formatarNumero(item.autonomia_fiscal, 2)} · IFDM: ${formatarNumero(item.ifdm_geral, 3)}</small>
     `;
     elementos.programaCenarios.appendChild(card);
+  });
+}
+
+function renderizarTabelaMapaUnificado(territorios) {
+  elementos.programaTabelaTerritorios.innerHTML = "";
+  const territoriosFiltrados = ordenarTerritoriosMapaUnificado(filtrarTerritoriosMapaUnificado(territorios || []));
+  const totalBrasil = (territorios || []).reduce((acumulado, territorio) => acumulado + (territorio.populacao_total || 0), 0);
+  const totalPaginas = Math.max(1, Math.ceil(territoriosFiltrados.length / estado.itensPorPaginaTerritoriosPrograma));
+  estado.paginaTerritoriosPrograma = Math.min(Math.max(1, estado.paginaTerritoriosPrograma), totalPaginas);
+  const inicio = (estado.paginaTerritoriosPrograma - 1) * estado.itensPorPaginaTerritoriosPrograma;
+  const territoriosDaPagina = territoriosFiltrados.slice(inicio, inicio + estado.itensPorPaginaTerritoriosPrograma);
+
+  territoriosDaPagina.forEach((territorio) => {
+    const linha = document.createElement("tr");
+    const municipios = (territorio.municipios || [])
+      .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
+      .filter(Boolean)
+      .join(", ");
+
+    linha.innerHTML = `
+      <td>${territorio.nome}</td>
+      <td>${territorio.uf}</td>
+      <td>${municipios || "Sem detalhamento nominal disponível."}</td>
+      <td>${formatarInteiro(territorio.populacao_total)}</td>
+    `;
+    elementos.programaTabelaTerritorios.appendChild(linha);
+  });
+
+  if (!territoriosDaPagina.length) {
+    const linha = document.createElement("tr");
+    linha.innerHTML = '<td colspan="4">Nenhum território encontrado para a cidade pesquisada.</td>';
+    elementos.programaTabelaTerritorios.appendChild(linha);
+  }
+
+  elementos.programaTabelaTotalBrasil.textContent = formatarInteiro(totalBrasil);
+  elementos.programaPaginacaoResumo.textContent = `Página ${formatarInteiro(estado.paginaTerritoriosPrograma)} de ${formatarInteiro(
+    totalPaginas
+  )} · ${formatarInteiro(territoriosFiltrados.length)} territórios encontrados`;
+  elementos.programaPaginaAnterior.disabled = estado.paginaTerritoriosPrograma <= 1;
+  elementos.programaPaginaProxima.disabled = estado.paginaTerritoriosPrograma >= totalPaginas;
+  sincronizarCabecalhosTabelaPrograma();
+}
+
+function sincronizarControlesTabelaPrograma() {
+  elementos.programaBuscaTerritorios.value = estado.buscaTerritoriosPrograma;
+}
+
+function filtrarTerritoriosMapaUnificado(territorios) {
+  const termo = normalizarTextoLivre(estado.buscaTerritoriosPrograma);
+  if (!termo) return territorios;
+  return territorios.filter((territorio) => {
+    const municipios = (territorio.municipios || [])
+      .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
+      .join(" ");
+    return [territorio.nome, territorio.uf, municipios].some((valor) => normalizarTextoLivre(valor).includes(termo));
+  });
+}
+
+function ordenarTerritoriosMapaUnificado(territorios) {
+  const { chave, direcao } = estado.ordenacaoTerritoriosPrograma;
+  const fator = direcao === "desc" ? -1 : 1;
+  return [...territorios].sort((a, b) => {
+    if (chave === "populacao_total") {
+      return ((a.populacao_total || 0) - (b.populacao_total || 0)) * fator;
+    }
+    return normalizarTextoLivre(a[chave]).localeCompare(normalizarTextoLivre(b[chave]), "pt-BR") * fator;
+  });
+}
+
+function sincronizarCabecalhosTabelaPrograma() {
+  const botoes = [
+    { elemento: elementos.programaOrdenarTerritorio, chave: "nome", rotulo: "Território novo" },
+    { elemento: elementos.programaOrdenarUf, chave: "uf", rotulo: "UF" },
+    { elemento: elementos.programaOrdenarPopulacao, chave: "populacao_total", rotulo: "População agregada" },
+  ];
+  botoes.forEach(({ elemento, chave, rotulo }) => {
+    const ativo = estado.ordenacaoTerritoriosPrograma.chave === chave;
+    const seta = !ativo ? "↕" : estado.ordenacaoTerritoriosPrograma.direcao === "asc" ? "↑" : "↓";
+    elemento.textContent = `${rotulo} ${seta}`;
+    elemento.setAttribute("aria-pressed", String(ativo));
   });
 }
 
@@ -460,9 +609,92 @@ function renderizarArquiteturaLegal(eixos) {
   });
 }
 
+function renderizarCapitaisIfdm(capitais) {
+  elementos.programaCapitaisIfdm.innerHTML = "";
+  if (!capitais.length) {
+    elementos.programaCapitaisIfdm.innerHTML = '<div class="empty-state">Sem capitais carregadas para o IFDM.</div>';
+    return;
+  }
+  capitais.slice(0, 10).forEach((capital) => {
+    const card = document.createElement("div");
+    card.className = "programa-card";
+    card.innerHTML = `
+      <span>${capital.nome_municipio} (${capital.uf})</span>
+      <strong>${formatarNumero(capital.ifdm_geral_2023, 3)} · ranking ${formatarInteiro(capital.ranking_2023)}</strong>
+      <small>Emprego & renda: ${formatarNumero(capital.ifdm_emprego_renda_2023, 3)} · Educação: ${formatarNumero(
+        capital.ifdm_educacao_2023,
+        3
+      )} · Saúde: ${formatarNumero(capital.ifdm_saude_2023, 3)}</small>
+    `;
+    elementos.programaCapitaisIfdm.appendChild(card);
+  });
+}
+
 function obterNomeMunicipioPorCodigo(codigoIbge) {
   const linha = estado.linhas.find((item) => String(item.ano) === estado.anoAtual && item.codigo_ibge === codigoIbge);
   return linha ? `${linha.nome_municipio} (${linha.uf})` : codigoIbge;
+}
+
+function renderizarMapaUnificadoPrograma(territorios) {
+  if (!elementos.mapaPrograma) return;
+  elementos.mapaPrograma.innerHTML = "";
+  elementos.mapaPrograma.setAttribute("viewBox", `0 0 ${estado.metadata.mapa.largura} ${estado.metadata.mapa.altura}`);
+  const namespace = "http://www.w3.org/2000/svg";
+  const grupo = document.createElementNS(namespace, "g");
+  grupo.setAttribute("id", "grupo-mapa-programa");
+  elementos.mapaPrograma.appendChild(grupo);
+  const escala = criarEscalaNumerica(
+    territorios.map((item) => item.dependencia_media).filter(valorSignificativo),
+    ["#dce5f0", "#7a99b9", "#214565"]
+  );
+
+  territorios.forEach((territorio) => {
+    const path = document.createElementNS(namespace, "path");
+    const cor = valorSignificativo(territorio.dependencia_media) ? escala.pick(Number(territorio.dependencia_media)) : "#d6dad6";
+    path.setAttribute("d", territorio.caminho_svg);
+    path.setAttribute("fill", cor);
+    path.setAttribute("stroke", "rgba(255,255,255,0.45)");
+    path.setAttribute("stroke-width", "0.42");
+    path.setAttribute("class", "municipality");
+    path.addEventListener("mouseenter", (evento) => exibirTooltipPrograma(evento, territorio));
+    path.addEventListener("mousemove", posicionarTooltipPrograma);
+    path.addEventListener("mouseleave", ocultarTooltipPrograma);
+    grupo.appendChild(path);
+  });
+  habilitarNavegacaoMapa(elementos.mapaPrograma, "programa", "grupo-mapa-programa");
+  aplicarTransformacaoMapa("programa", "grupo-mapa-programa");
+}
+
+function exibirTooltipPrograma(evento, territorio) {
+  elementos.tooltipPrograma.classList.remove("hidden");
+  elementos.tooltipPrograma.innerHTML = `
+    <strong>${territorio.nome}</strong><br />
+    ${formatarInteiro(territorio.populacao_total)} hab.<br />
+    ${territorio.quantidade_municipios} municípios<br />
+    Dependência média: ${formatarNumero(territorio.dependencia_media, 1)}%<br />
+    Status predominante: ${territorio.status_predominante}
+  `;
+  posicionarTooltipPrograma(evento);
+}
+
+function posicionarTooltipPrograma(evento) {
+  const bounds = evento.currentTarget.ownerSVGElement.getBoundingClientRect();
+  elementos.tooltipPrograma.style.left = `${evento.clientX - bounds.left + 14}px`;
+  elementos.tooltipPrograma.style.top = `${evento.clientY - bounds.top + 14}px`;
+}
+
+function posicionarTooltipClima(evento) {
+  const bounds = evento.currentTarget.ownerSVGElement.getBoundingClientRect();
+  elementos.tooltipClima.style.left = `${evento.clientX - bounds.left + 14}px`;
+  elementos.tooltipClima.style.top = `${evento.clientY - bounds.top + 14}px`;
+}
+
+function ocultarTooltipPrograma() {
+  elementos.tooltipPrograma.classList.add("hidden");
+}
+
+function ocultarTooltipClima() {
+  elementos.tooltipClima.classList.add("hidden");
 }
 
 function preencherControles() {
@@ -566,6 +798,32 @@ function registrarEventos() {
     estado.climaUfAtual = evento.target.value;
     renderizarClima();
   });
+  elementos.programaBuscaTerritorios.addEventListener("input", (evento) => {
+    estado.buscaTerritoriosPrograma = evento.target.value || "";
+    estado.paginaTerritoriosPrograma = 1;
+    renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+  });
+  [elementos.programaOrdenarTerritorio, elementos.programaOrdenarUf, elementos.programaOrdenarPopulacao].forEach((botao) => {
+    botao.addEventListener("click", () => {
+      const chave = botao.dataset.sortKey;
+      if (estado.ordenacaoTerritoriosPrograma.chave === chave) {
+        estado.ordenacaoTerritoriosPrograma.direcao =
+          estado.ordenacaoTerritoriosPrograma.direcao === "asc" ? "desc" : "asc";
+      } else {
+        estado.ordenacaoTerritoriosPrograma = { chave, direcao: chave === "populacao_total" ? "desc" : "asc" };
+      }
+      estado.paginaTerritoriosPrograma = 1;
+      renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+    });
+  });
+  elementos.programaPaginaAnterior.addEventListener("click", () => {
+    estado.paginaTerritoriosPrograma = Math.max(1, estado.paginaTerritoriosPrograma - 1);
+    renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+  });
+  elementos.programaPaginaProxima.addEventListener("click", () => {
+    estado.paginaTerritoriosPrograma += 1;
+    renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+  });
   document.addEventListener("mouseover", (evento) => {
     const alvo = evento.target.closest(".ajuda-indicador");
     if (!alvo) return;
@@ -583,14 +841,15 @@ function registrarEventos() {
     const alvo = evento.target.closest(".ajuda-indicador");
     if (!alvo) {
       ocultarTooltipAjuda();
-      return;
+    } else {
+      evento.preventDefault();
+      mostrarTooltipAjuda(alvo, evento);
     }
-    evento.preventDefault();
-    mostrarTooltipAjuda(alvo, evento);
   });
-  elementos.resetarMapa.addEventListener("click", () => {
-    estado.mapaTransform = { escala: 1, x: 0, y: 0 };
-    aplicarTransformacaoMapa();
+  document.addEventListener("click", (evento) => {
+    const botao = evento.target.closest(".controle-mapa");
+    if (!botao) return;
+    aplicarAcaoControleMapa(botao.dataset.mapTarget, botao.dataset.mapAction);
   });
 }
 
@@ -640,10 +899,9 @@ function atualizarPainelMetrica() {
 function renderizarMapa(caminhos, mapaLinhas) {
   elementos.mapa.innerHTML = "";
   elementos.mapa.setAttribute("viewBox", `0 0 ${estado.metadata.mapa.largura} ${estado.metadata.mapa.altura}`);
-  elementsEnableMapNavigation();
   const namespace = "http://www.w3.org/2000/svg";
   const grupo = document.createElementNS(namespace, "g");
-  grupo.setAttribute("id", "grupo-mapa");
+  grupo.setAttribute("id", "grupo-mapa-principal");
   elementos.mapa.appendChild(grupo);
 
   const metrica = definicoesMetricas[estado.metricaAtual];
@@ -670,40 +928,72 @@ function renderizarMapa(caminhos, mapaLinhas) {
     }
     grupo.appendChild(path);
   });
-  aplicarTransformacaoMapa();
+  habilitarNavegacaoMapa(elementos.mapa, "principal", "grupo-mapa-principal");
+  aplicarTransformacaoMapa("principal", "grupo-mapa-principal");
 }
 
-function elementsEnableMapNavigation() {
+function habilitarNavegacaoMapa(svg, chaveMapa, idGrupo) {
   let dragging = false;
   let start = { x: 0, y: 0 };
-  elementos.mapa.onwheel = (evento) => {
+  svg.onwheel = (evento) => {
     evento.preventDefault();
     const delta = evento.deltaY > 0 ? 0.9 : 1.1;
-    estado.mapaTransform.escala = Math.max(1, Math.min(8, estado.mapaTransform.escala * delta));
-    aplicarTransformacaoMapa();
+    const transform = estado.mapaTransforms[chaveMapa];
+    transform.escala = Math.max(1, Math.min(8, transform.escala * delta));
+    aplicarTransformacaoMapa(chaveMapa, idGrupo);
   };
-  elementos.mapa.onmousedown = (evento) => {
+  svg.onmousedown = (evento) => {
     dragging = true;
-    start = { x: evento.clientX - estado.mapaTransform.x, y: evento.clientY - estado.mapaTransform.y };
+    const transform = estado.mapaTransforms[chaveMapa];
+    start = { x: evento.clientX - transform.x, y: evento.clientY - transform.y };
   };
-  window.onmousemove = (evento) => {
-    if (!dragging || estado.mapaTransform.escala === 1) return;
-    estado.mapaTransform.x = evento.clientX - start.x;
-    estado.mapaTransform.y = evento.clientY - start.y;
-    aplicarTransformacaoMapa();
+  svg.onmousemove = (evento) => {
+    if (!dragging) return;
+    const transform = estado.mapaTransforms[chaveMapa];
+    if (transform.escala === 1) return;
+    transform.x = evento.clientX - start.x;
+    transform.y = evento.clientY - start.y;
+    aplicarTransformacaoMapa(chaveMapa, idGrupo);
   };
-  window.onmouseup = () => {
+  svg.onmouseleave = () => {
     dragging = false;
   };
+  window.addEventListener("mouseup", () => {
+    dragging = false;
+  });
 }
 
-function aplicarTransformacaoMapa() {
-  const grupo = document.getElementById("grupo-mapa");
+function aplicarTransformacaoMapa(chaveMapa, idGrupo) {
+  const grupo = document.getElementById(idGrupo);
   if (!grupo) return;
+  const transform = estado.mapaTransforms[chaveMapa];
   grupo.setAttribute(
     "transform",
-    `translate(${estado.mapaTransform.x} ${estado.mapaTransform.y}) scale(${estado.mapaTransform.escala})`
+    `translate(${transform.x} ${transform.y}) scale(${transform.escala})`
   );
+}
+
+function aplicarAcaoControleMapa(chaveMapa, acao) {
+  const ids = {
+    principal: "grupo-mapa-principal",
+    clima: "grupo-mapa-clima",
+    programa: "grupo-mapa-programa",
+  };
+  const transform = estado.mapaTransforms[chaveMapa];
+  if (!transform) return;
+  const passo = 40;
+  if (acao === "zoom_in") transform.escala = Math.min(8, transform.escala * 1.2);
+  if (acao === "zoom_out") transform.escala = Math.max(1, transform.escala / 1.2);
+  if (acao === "up") transform.y += passo;
+  if (acao === "down") transform.y -= passo;
+  if (acao === "left") transform.x += passo;
+  if (acao === "right") transform.x -= passo;
+  if (acao === "reset") {
+    transform.escala = 1;
+    transform.x = 0;
+    transform.y = 0;
+  }
+  aplicarTransformacaoMapa(chaveMapa, ids[chaveMapa]);
 }
 
 function renderizarLegenda(linhasFiltradas) {
@@ -806,6 +1096,12 @@ function renderizarDetalhe(linha, linhasFiltradas) {
     ["Mortalidade infantil", formatarNumero(linha.mortalidade_infantil, 2)],
     ["PIB aproximado", formatarMoeda(linha.pib_aproximado)],
     ["Mulheres no trabalho formal", `${formatarNumero(linha.proporcao_mulheres_trabalho_formal, 1)}%`],
+    ["IFDM Geral", formatarNumero(linha.ifdm_geral, 3)],
+    ["IFDM Educação", formatarNumero(linha.ifdm_educacao, 3)],
+    ["IFDM Saúde", formatarNumero(linha.ifdm_saude, 3)],
+    ["IFDM Emprego & renda", formatarNumero(linha.ifdm_emprego_renda, 3)],
+    ["Ranking IFDM nacional", formatarInteiro(linha.ifdm_ranking_nacional)],
+    ["Ranking IFDM estadual", formatarInteiro(linha.ifdm_ranking_estadual)],
     ["Tem RGF", String(linha.tem_rgf ?? "Sem dado")],
     ["Avisos da base", linha.aviso_indicadores || "Sem avisos"],
   ];
@@ -1070,6 +1366,9 @@ function renderizarMapaClimatico(bundle) {
   elementos.mapaClima.innerHTML = "";
   elementos.mapaClima.setAttribute("viewBox", `0 0 ${estado.metadata.mapa.largura} ${estado.metadata.mapa.altura}`);
   const namespace = "http://www.w3.org/2000/svg";
+  const grupo = document.createElementNS(namespace, "g");
+  grupo.setAttribute("id", "grupo-mapa-clima");
+  elementos.mapaClima.appendChild(grupo);
   const valoresUf = Object.fromEntries(
     Object.entries(bundle.ufs).map(([uf, item]) => [uf, item.media_anual]).filter(([, valor]) => valor !== null)
   );
@@ -1092,15 +1391,17 @@ function renderizarMapaClimatico(bundle) {
     path.setAttribute("opacity", destacar ? "1" : "0.16");
     if (uf && valor !== null) {
       path.addEventListener("mouseenter", (evento) => {
-        elementos.tooltip.classList.remove("hidden");
-        elementos.tooltip.innerHTML = `<strong>${uf}</strong><br />${formatarNumero(valor, 1)} ${bundle.unidade}<br />Indicador climático por UF`;
-        posicionarTooltip(evento);
+        elementos.tooltipClima.classList.remove("hidden");
+        elementos.tooltipClima.innerHTML = `<strong>${uf}</strong><br />${formatarNumero(valor, 1)} ${bundle.unidade}<br />Indicador climático por UF`;
+        posicionarTooltipClima(evento);
       });
-      path.addEventListener("mousemove", posicionarTooltip);
-      path.addEventListener("mouseleave", ocultarTooltip);
+      path.addEventListener("mousemove", posicionarTooltipClima);
+      path.addEventListener("mouseleave", ocultarTooltipClima);
     }
-    elementos.mapaClima.appendChild(path);
+    grupo.appendChild(path);
   });
+  habilitarNavegacaoMapa(elementos.mapaClima, "clima", "grupo-mapa-clima");
+  aplicarTransformacaoMapa("clima", "grupo-mapa-clima");
 }
 
 function criarInsightClimatico(bundle, alvo) {
@@ -1328,6 +1629,14 @@ function formatarMes(valor) {
   if (!valor) return "-";
   const texto = String(valor);
   return `${texto.slice(4, 6)}/${texto.slice(0, 4)}`;
+}
+
+function normalizarTextoLivre(valor) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 function statusParaClasse(status) {

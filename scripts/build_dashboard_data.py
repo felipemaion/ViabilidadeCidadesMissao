@@ -6,6 +6,7 @@ import math
 import re
 import struct
 import sys
+import unicodedata
 import zipfile
 from collections import Counter
 from pathlib import Path
@@ -25,6 +26,8 @@ DOCX_FILE_ETAPA_1 = SOURCE_DIR / "Cartilha - Redução dos Municípios.docx"
 DOCX_FILE_ETAPA_2 = SOURCE_DIR / "Cartilha de Redução de Municípios - Segunda Etapa.docx"
 DOCX_FILE = DOCX_FILE_ETAPA_1
 DOCX_FILE_2 = DOCX_FILE_ETAPA_2
+IFDM_XLSX = SOURCE_DIR / "Ranking-IFDM-2025-ano-base-2023.xlsx"
+IFDM_CAPITAIS_XLSX = SOURCE_DIR / "Ranking-IFDM-Capitais-2025-ano-base-2023.xlsx"
 CLIMATE_PREC_XLSX = SOURCE_DIR / "Normal-Climatologica-PREC.xlsx"
 CLIMATE_TMAX_XLSX = SOURCE_DIR / "Normal-Climatologica-TMAX.xlsx"
 CLIMATE_UR_XLSX = SOURCE_DIR / "Normal-Climatologica-URHORA.xlsx"
@@ -182,10 +185,60 @@ def first_sheet_path(archive):
     return "xl/" + rel_map[rel_id]
 
 
+def sheet_path_by_name(archive, sheet_name):
+    workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+    relationships = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+    rel_map = {node.attrib["Id"]: node.attrib["Target"] for node in relationships}
+    for sheet in workbook.findall("a:sheets/a:sheet", NS):
+        if sheet.attrib.get("name") == sheet_name:
+            rel_id = sheet.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]
+            return "xl/" + rel_map[rel_id]
+    raise KeyError(f"Sheet not found: {sheet_name}")
+
+
 def xlsx_rows(path):
     with zipfile.ZipFile(path) as archive:
         shared_strings = load_shared_strings(archive)
         sheet_path = first_sheet_path(archive)
+        context = ET.iterparse(archive.open(sheet_path), events=("end",))
+        headers = None
+        for _, elem in context:
+            if elem.tag != "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}row":
+                continue
+            row_map = {}
+            for cell in elem.findall("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}c"):
+                ref = cell.attrib.get("r", "")
+                idx = excel_col_to_index(ref)
+                if idx < 0:
+                    continue
+                value = ""
+                cell_type = cell.attrib.get("t")
+                if cell_type == "inlineStr":
+                    text_node = cell.find(".//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t")
+                    value = text_node.text if text_node is not None else ""
+                else:
+                    value_node = cell.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}v")
+                    if value_node is None:
+                        continue
+                    value = value_node.text or ""
+                    if cell_type == "s":
+                        index = int(value)
+                        value = shared_strings[index] if index < len(shared_strings) else value
+                row_map[idx] = value
+            if headers is None:
+                if not row_map:
+                    continue
+                max_idx = max(row_map)
+                headers = [row_map.get(idx, "").strip() for idx in range(max_idx + 1)]
+            else:
+                yield [row_map.get(idx, "") for idx in range(len(headers))], headers
+            elem.clear()
+
+
+def xlsx_rows_sheet(path, sheet_name):
+    with zipfile.ZipFile(path) as archive:
+        shared_strings = load_shared_strings(archive)
+        sheet_path = sheet_path_by_name(archive, sheet_name)
         context = ET.iterparse(archive.open(sheet_path), events=("end",))
         headers = None
         for _, elem in context:
@@ -373,6 +426,14 @@ def clean_string(value):
     return str(value).strip() if value is not None else ""
 
 
+def normalize_label(value):
+    text = clean_string(value)
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = re.sub(r"[^a-zA-Z0-9]+", " ", text).strip().lower()
+    return re.sub(r"\s+", " ", text)
+
+
 def parse_number(value):
     text = clean_string(value)
     if not text or text == "-":
@@ -445,6 +506,58 @@ def load_enriched_rows():
                 "nome_municipio_fonte": clean_string(row.get("nome_municipio")),
             }
     return enriched
+
+
+def load_ifdm_rows(name_index):
+    ifdm = {}
+    for row in raw_xlsx_rows(IFDM_XLSX):
+        ranking = clean_string(row.get("A"))
+        if not ranking.isdigit():
+            continue
+        uf = clean_string(row.get("D"))
+        municipality_name = clean_string(row.get("E"))
+        key = (uf, normalize_label(municipality_name))
+        code = name_index.get(key)
+        if not code:
+            continue
+        ifdm[code] = {
+            "ifdm_geral": parse_number(row.get("F")),
+            "ifdm_educacao": parse_number(row.get("G")),
+            "ifdm_saude": parse_number(row.get("H")),
+            "ifdm_emprego_renda": parse_number(row.get("I")),
+            "ifdm_ranking_nacional": parse_number(row.get("A")),
+            "ifdm_ranking_estadual": parse_number(row.get("B")),
+            "ifdm_ano_base": 2023,
+        }
+    return ifdm
+
+
+def load_ifdm_capitals():
+    capitals = []
+    for row in raw_xlsx_rows(IFDM_CAPITAIS_XLSX):
+        ranking_2023 = parse_number(row.get("C"))
+        uf = clean_string(row.get("D"))
+        municipality_name = clean_string(row.get("E"))
+        if not uf or not municipality_name:
+            continue
+        if ranking_2023 is None:
+            continue
+        capitals.append(
+            {
+                "uf": uf,
+                "nome_municipio": municipality_name,
+                "ranking_2023": ranking_2023,
+                "ifdm_geral_2023": parse_number(row.get("G")),
+                "variacao_pct": parse_number(row.get("H")),
+                "ifdm_emprego_renda_2023": parse_number(row.get("J")),
+                "ifdm_educacao_2023": parse_number(row.get("M")),
+                "ifdm_saude_2023": parse_number(row.get("P")),
+                "ano_base": 2023,
+            }
+        )
+    capitals = [item for item in capitals if item["ranking_2023"] is not None]
+    capitals.sort(key=lambda item: item["ranking_2023"])
+    return capitals
 
 
 def latest_bolsa_rows():
@@ -835,6 +948,17 @@ def build_dataset():
     finance_rows, years = load_finance_rows()
     enriched = load_enriched_rows()
     bolsa_rows, latest_month = latest_bolsa_rows()
+    name_index = {}
+    for code, enrich in enriched.items():
+        uf = clean_string(enrich.get("uf"))
+        name = clean_string(enrich.get("nome_municipio_fonte"))
+        if uf and name:
+            name_index[(uf, normalize_label(name))] = code
+    for row in finance_rows:
+        if row.get("uf") and row.get("nome_municipio"):
+            name_index[(row["uf"], normalize_label(row["nome_municipio"]))] = row["codigo_ibge"]
+    ifdm_rows = load_ifdm_rows(name_index)
+    ifdm_capitais = load_ifdm_capitals()
 
     dataset = []
     status_counts = Counter()
@@ -848,6 +972,7 @@ def build_dataset():
         if not enrich:
             continue
         bolsa = bolsa_rows.get(row["codigo_ibge6"], {})
+        ifdm = ifdm_rows.get(code, {})
         municipality_name = row["nome_municipio"] or enrich.get("nome_municipio_fonte") or ""
         uf = row["uf"] or enrich.get("uf") or ""
         region = enrich.get("regiao") or ""
@@ -923,6 +1048,13 @@ def build_dataset():
             "mortalidade_infantil": enrich.get("mortalidade_infantil"),
             "pib_aproximado": enrich.get("pib_aproximado"),
             "proporcao_mulheres_trabalho_formal": enrich.get("proporcao_mulheres_trabalho_formal"),
+            "ifdm_geral": ifdm.get("ifdm_geral"),
+            "ifdm_educacao": ifdm.get("ifdm_educacao"),
+            "ifdm_saude": ifdm.get("ifdm_saude"),
+            "ifdm_emprego_renda": ifdm.get("ifdm_emprego_renda"),
+            "ifdm_ranking_nacional": ifdm.get("ifdm_ranking_nacional"),
+            "ifdm_ranking_estadual": ifdm.get("ifdm_ranking_estadual"),
+            "ifdm_ano_base": ifdm.get("ifdm_ano_base"),
         }
         item["interpretacao"] = build_interpretation(item)
         status_counts[item["status_viabilidade"]] += 1
@@ -939,6 +1071,8 @@ def build_dataset():
         "contagem_status": dict(status_counts),
         "ultima_referencia_bolsa_familia": latest_month,
         "sem_regiao": sorted(set(coverage_missing)),
+        "ifdm_capitais": ifdm_capitais,
+        "total_ifdm_com_match": len(ifdm_rows),
     }
 
 
@@ -1002,6 +1136,8 @@ def main():
             "financeiro": str(FINANCE_XLSX.relative_to(ROOT)),
             "municipios_enriquecidos": str(ENRICHED_CSV.relative_to(ROOT)),
             "bolsa_familia": str(BOLSA_CSV.relative_to(ROOT)),
+            "ifdm_municipios": str(IFDM_XLSX.relative_to(ROOT)),
+            "ifdm_capitais": str(IFDM_CAPITAIS_XLSX.relative_to(ROOT)),
             "cartilha": str(DOCX_FILE_ETAPA_1.relative_to(ROOT)),
             "cartilha_segunda_etapa": str(DOCX_FILE_ETAPA_2.relative_to(ROOT)),
             "malha_municipal": str(BOUNDARY_ZIP.relative_to(ROOT)),
@@ -1019,8 +1155,10 @@ def main():
             "municipios_com_geometria": len({item["codigo_ibge"] for year in map_by_year.values() for item in year}),
             "total_sem_geometria": len(missing_geometry),
             "total_sem_regiao": len(dataset_bundle["sem_regiao"]),
+            "total_ifdm_com_match": dataset_bundle["total_ifdm_com_match"],
             "amostra_sem_geometria": missing_geometry[:25],
         },
+        "ifdm_capitais": dataset_bundle["ifdm_capitais"],
     }
 
     with (OUTPUT_DIR / "metadata.json").open("w", encoding="utf-8") as handle:

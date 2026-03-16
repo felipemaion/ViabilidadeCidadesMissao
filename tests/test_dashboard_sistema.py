@@ -73,6 +73,8 @@ class TestOrganizacaoDeArquivos(BaseDashboardTest):
             "Cartilha - Redução dos Municípios.docx",
             "Cartilha de Redução de Municípios - Segunda Etapa.docx",
             "IBGE 2026.xlsx",
+            "Ranking-IFDM-2025-ano-base-2023.xlsx",
+            "Ranking-IFDM-Capitais-2025-ano-base-2023.xlsx",
             "Normal-Climatologica-PREC.xlsx",
             "Normal-Climatologica-TMAX.xlsx",
             "Normal-Climatologica-URHORA.xlsx",
@@ -148,6 +150,7 @@ class TestContratosDosArtefatos(BaseDashboardTest):
         self.assertIn("qualidade", self.metadata)
         self.assertIn("cartilhas", self.metadata["narrativa"])
         self.assertIn("comparativo", self.metadata["narrativa"])
+        self.assertIn("ifdm_capitais", self.metadata)
 
     def test_fontes_declaradas_no_metadata_existem(self):
         for caminho_relativo in self.metadata["fontes"].values():
@@ -196,6 +199,10 @@ class TestIntegridadeDasLinhas(BaseDashboardTest):
             "populacao",
             "bolsa_familia_total",
             "referencia_bolsa_familia",
+            "ifdm_geral",
+            "ifdm_educacao",
+            "ifdm_saude",
+            "ifdm_emprego_renda",
             "interpretacao",
         }
         for linha in self.linhas[:500]:
@@ -346,6 +353,8 @@ class TestFrontendEmPortugues(BaseDashboardTest):
             "Programa de reforma municipal",
             "Territórios preliminares propostos",
             "Arquitetura legal e transição",
+            "Mapa simulado dos municípios unificados",
+            "Capitais no IFDM",
         ]
         for termo in obrigatorios:
             self.assertIn(termo, self.index_html)
@@ -368,12 +377,34 @@ class TestFrontendEmPortugues(BaseDashboardTest):
             "renderizarMapaClimatico",
             "renderizarCartilhas",
             "renderizarProgramaReforma",
+            "renderizarMapaUnificadoPrograma",
+            "aplicarAcaoControleMapa",
+            "habilitarNavegacaoMapa",
             "resetar-mapa",
             "ajuda-indicador",
             "tooltip-ajuda",
         ]
         for termo in termos:
             self.assertIn(termo, self.app_js)
+
+    def test_frontend_tem_controles_em_todos_os_mapas(self):
+        self.assertGreaterEqual(self.index_html.count('class="botao-mapa controle-mapa"'), 18)
+        self.assertIn("tooltip-clima", self.index_html)
+
+    def test_frontend_tem_tabela_do_cenario_unificado(self):
+        self.assertIn("programa-tabela-territorios", self.index_html)
+        self.assertIn("programa-tabela-total-brasil", self.index_html)
+        self.assertIn("renderizarTabelaMapaUnificado", self.app_js)
+        self.assertIn("programa-busca-territorios", self.index_html)
+        self.assertIn("programa-pagina-anterior", self.index_html)
+        self.assertIn("programa-pagina-proxima", self.index_html)
+        self.assertIn("itensPorPaginaTerritoriosPrograma: 15", self.app_js)
+        self.assertIn("filtrarTerritoriosMapaUnificado", self.app_js)
+        self.assertIn("programa-ordenar-territorio", self.index_html)
+        self.assertIn("programa-ordenar-uf", self.index_html)
+        self.assertIn("programa-ordenar-populacao", self.index_html)
+        self.assertIn("ordenarTerritoriosMapaUnificado", self.app_js)
+        self.assertIn('ordenacaoTerritoriosPrograma: { chave: "nome", direcao: "asc" }', self.app_js)
 
 
 class TestProgramaReforma(BaseDashboardTest):
@@ -383,6 +414,7 @@ class TestProgramaReforma(BaseDashboardTest):
         self.assertIn("cenarios_amalgama", self.programa)
         self.assertIn("arquitetura_legal", self.programa)
         self.assertIn("lrg_conceitual", self.programa)
+        self.assertIn("mapa_unificado", self.programa)
 
     def test_programa_reforma_tem_territorios_preliminares(self):
         territorios = self.programa["territorios_identidade"]["territorios"]
@@ -393,15 +425,64 @@ class TestProgramaReforma(BaseDashboardTest):
         self.assertIn("municipios", amostra)
         self.assertIn("populacao_total", amostra)
 
+    def test_mapa_unificado_tem_geometrias_cenario(self):
+        mapa = self.programa["mapa_unificado"]
+        self.assertIn("territorios", mapa)
+        self.assertGreater(len(mapa["territorios"]), 20)
+        amostra = mapa["territorios"][0]
+        self.assertTrue(amostra["caminho_svg"].startswith("M "))
+        self.assertIn(" Z", amostra["caminho_svg"])
+        self.assertGreaterEqual(amostra["quantidade_municipios"], 1)
+        self.assertEqual(len(amostra["centroide"]), 2)
+
+    def test_mapa_unificado_tem_populacao_brasil_consistente(self):
+        territorios = self.programa["mapa_unificado"]["territorios"]
+        total_cenario = sum(item["populacao_total"] for item in territorios)
+        total_base = sum(linha["populacao"] for linha in self.linhas if linha["ano"] == self.programa["mapa_unificado"]["ano_referencia"])
+        self.assertEqual(total_base, total_cenario)
+
+    def test_mapa_unificado_tem_mais_de_uma_pagina_de_registros(self):
+        territorios = self.programa["mapa_unificado"]["territorios"]
+        self.assertGreater(len(territorios), 15)
+
+    def test_busca_por_cidade_encontra_territorio_que_a_contem(self):
+        nomes_por_codigo = {
+            linha["codigo_ibge"]: linha["nome_municipio"].lower()
+            for linha in self.linhas
+            if linha["ano"] == self.programa["mapa_unificado"]["ano_referencia"]
+        }
+        territorios = self.programa["mapa_unificado"]["territorios"]
+        alvo = next(
+            territorio
+            for territorio in territorios
+            if any("curitiba" in nomes_por_codigo.get(codigo, "") for codigo in territorio["municipios"])
+        )
+        self.assertIsNotNone(alvo)
+
+    def test_mapa_unificado_pode_ser_ordenado_por_populacao(self):
+        territorios = self.programa["mapa_unificado"]["territorios"]
+        ordenados = sorted(territorios, key=lambda item: item["populacao_total"], reverse=True)
+        self.assertGreaterEqual(ordenados[0]["populacao_total"], ordenados[1]["populacao_total"])
+
+    def test_cenarios_prioritarios_priorizam_status_conhecido(self):
+        prioritarios = self.programa["cenarios_amalgama"]["municipios_prioritarios"][:10]
+        self.assertTrue(all(item["status_viabilidade"] != "Sem dado" for item in prioritarios))
+        self.assertIn("municipios_com_lacuna_classificatoria", self.programa["cenarios_amalgama"])
+
     def test_programa_reforma_declara_ifdm_com_status_metodologico(self):
         ifdm = self.programa["visao_geral"]["ifdm"]
-        self.assertIn(ifdm["status"], {"pendente_integracao_verificada", "integrado"})
-        self.assertIn("verificada", ifdm["observacao"])
+        self.assertEqual("integrado", ifdm["status"])
+        self.assertIn("firjan", ifdm["observacao"].lower())
 
     def test_lrg_fica_marcada_como_conceitual(self):
         lrg = self.programa["lrg_conceitual"]
         self.assertEqual("em_analise_pela_equipe", lrg["status"])
         self.assertIn("conceitual", lrg["aviso"].lower())
+
+    def test_ifdm_capitais_foi_integrado_ao_programa(self):
+        capitais = self.programa["ifdm_capitais"]
+        self.assertGreater(len(capitais), 5)
+        self.assertEqual("Curitiba", capitais[0]["nome_municipio"])
 
 
 class TestClimatologia(BaseDashboardTest):
@@ -452,6 +533,8 @@ class TestDocumentacaoEOperacao(BaseDashboardTest):
         self.assertIn("financeiro", self.metadata["fontes"])
         self.assertIn("cartilha", self.metadata["fontes"])
         self.assertIn("cartilha_segunda_etapa", self.metadata["fontes"])
+        self.assertIn("ifdm_municipios", self.metadata["fontes"])
+        self.assertIn("ifdm_capitais", self.metadata["fontes"])
         self.assertIn("malha_municipal", self.metadata["fontes"])
 
     def test_builder_nao_inclui_cnes_no_dashboard_v1(self):
