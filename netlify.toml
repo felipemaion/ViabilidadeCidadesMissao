@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build-data && npm run preparar-publicacao"
+  publish = "dist"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300"
+
+[[headers]]
+  for = "/data/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300"
