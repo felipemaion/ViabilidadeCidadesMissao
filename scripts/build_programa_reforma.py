@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import importlib.util
 import json
 from collections import Counter
 from pathlib import Path
@@ -13,6 +14,7 @@ METADATA_PATH = DATA_DIR / "metadata.json"
 LINHAS_PATH = DATA_DIR / "municipality_data.json"
 MAPA_PATH = DATA_DIR / "map_paths_by_year.json"
 OUTPUT_PATH = DATA_DIR / "programa_reforma.json"
+BUILD_DASHBOARD_PATH = ROOT / "scripts" / "build_dashboard_data.py"
 
 POP_REFERENCIA = 120000
 POP_OTIMA_REFERENCIA = 30000
@@ -21,6 +23,14 @@ POP_OTIMA_REFERENCIA = 30000
 def load_json(path):
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def load_dashboard_builder():
+    spec = importlib.util.spec_from_file_location("build_dashboard_data", BUILD_DASHBOARD_PATH)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 def mean(values):
@@ -65,20 +75,86 @@ def build_latest_rows():
     return latest_rows, int(ano)
 
 
+def quantize_point(point):
+    return (round(point[0], 6), round(point[1], 6))
+
+
+def normalize_edge(a, b):
+    edge = (quantize_point(a), quantize_point(b))
+    return edge if edge[0] <= edge[1] else (edge[1], edge[0])
+
+
+def build_adjacency_map(codes_by_uf=None):
+    builder = load_dashboard_builder()
+    features, _ = builder.read_shapefile(builder.BOUNDARY_ZIP)
+    if codes_by_uf is None:
+      codes_by_uf = {}
+    allowed_codes = set().union(*codes_by_uf.values()) if codes_by_uf else None
+    features = [feature for feature in features if allowed_codes is None or feature["codigo_ibge"] in allowed_codes]
+
+    edge_index = {}
+    for feature in features:
+        code = feature["codigo_ibge"]
+        if codes_by_uf and code not in codes_by_uf.get(feature["uf"], set()):
+            continue
+        for ring in feature["rings"]:
+            for idx in range(len(ring) - 1):
+                edge = normalize_edge(ring[idx], ring[idx + 1])
+                edge_index.setdefault(edge, []).append(code)
+
+    adjacency = {feature["codigo_ibge"]: set() for feature in features}
+    for members in edge_index.values():
+        unique_members = sorted(set(members))
+        if len(unique_members) < 2:
+            continue
+        for code in unique_members:
+            adjacency.setdefault(code, set()).update(other for other in unique_members if other != code)
+    return adjacency
+
+
+def pick_seed(rows_by_code, remaining):
+    return min(
+        remaining,
+        key=lambda code: (
+            rows_by_code[code]["centroide"][0],
+            rows_by_code[code]["centroide"][1],
+            rows_by_code[code].get("populacao") or 0,
+            code,
+        ),
+    )
+
+
+def pick_best_neighbor(rows_by_code, territory_codes, frontier):
+    territory_centroid_x = mean([rows_by_code[code]["centroide"][0] for code in territory_codes]) or 0
+    territory_centroid_y = mean([rows_by_code[code]["centroide"][1] for code in territory_codes]) or 0
+
+    def score(code):
+        row = rows_by_code[code]
+        centroid_x, centroid_y = row["centroide"]
+        distance = abs(centroid_x - territory_centroid_x) + abs(centroid_y - territory_centroid_y)
+        population = row.get("populacao") or 0
+        dependence = -(row.get("pct_dependencia_transf") or 0)
+        return (distance, population, dependence, code)
+
+    return min(frontier, key=score)
+
+
 def build_territories(rows):
     territorios = []
-    for uf in sorted({row["uf"] for row in rows}):
-        rows_uf = [row for row in rows if row["uf"] == uf]
-        rows_uf.sort(key=lambda row: (row["centroide"][0], row["centroide"][1], row["codigo_ibge"]))
+    rows_by_code = {row["codigo_ibge"]: row for row in rows}
+    codes_by_uf = {}
+    for row in rows:
+        codes_by_uf.setdefault(row["uf"], set()).add(row["codigo_ibge"])
+    adjacency = build_adjacency_map(codes_by_uf)
 
-        lote = []
-        populacao_acumulada = 0
+    for uf in sorted({row["uf"] for row in rows}):
+        remaining = set(codes_by_uf.get(uf, set()))
         indice = 1
 
-        def flush():
-            nonlocal lote, populacao_acumulada, indice
-            if not lote:
-                return
+        def flush(lote_codigos):
+            nonlocal indice
+            lote = [rows_by_code[codigo] for codigo in lote_codigos]
+            populacao_acumulada = sum((row.get("populacao") or 0) for row in lote)
             territorios.append(
                 {
                     "id": f"TERR-{uf}-{indice:02d}",
@@ -97,20 +173,26 @@ def build_territories(rows):
                     else "dentro_da_referencia",
                 }
             )
-            lote = []
-            populacao_acumulada = 0
             indice += 1
 
-        for row in rows_uf:
-            pop = row.get("populacao") or 0
-            if lote and populacao_acumulada >= POP_REFERENCIA:
-                flush()
-            lote.append(row)
-            populacao_acumulada += pop
+        while remaining:
+            seed = pick_seed(rows_by_code, remaining)
+            territory_codes = [seed]
+            remaining.remove(seed)
+            population = rows_by_code[seed].get("populacao") or 0
+            frontier = set(adjacency.get(seed, set())) & remaining
 
-        flush()
+            while frontier and population < POP_REFERENCIA:
+                next_code = pick_best_neighbor(rows_by_code, territory_codes, frontier)
+                territory_codes.append(next_code)
+                remaining.remove(next_code)
+                population += rows_by_code[next_code].get("populacao") or 0
+                frontier.discard(next_code)
+                frontier.update((adjacency.get(next_code, set()) & remaining))
 
-    return territorios
+            flush(territory_codes)
+
+    return territorios, adjacency
 
 
 def build_priority_rows(rows):
@@ -152,7 +234,7 @@ def build_priority_rows(rows):
 def build_program():
     rows, ano = build_latest_rows()
     metadata = load_json(METADATA_PATH)
-    territorios = build_territories(rows)
+    territorios, adjacency = build_territories(rows)
     prioridades, prioridades_com_lacuna = build_priority_rows(rows)
     mapa_unificado = build_unified_map(territorios, rows)
     capitais_ifdm = metadata.get("ifdm_capitais", [])
@@ -181,12 +263,13 @@ def build_program():
         },
         "territorios_identidade": {
             "metodologia": [
-                "Agrupamento preliminar por UF com ordenação espacial a partir dos centroides do mapa municipal.",
+                "Agrupamento preliminar por UF com crescimento territorial apenas por municípios fisicamente contíguos.",
                 "Uso de população, autonomia fiscal, dependência de transferências e Bolsa Família para síntese do território.",
                 "Modelo exploratório e revisável, adequado para discussão programática inicial e não para decisão final.",
             ],
             "parametro_populacional_referencia": POP_REFERENCIA,
             "parametro_populacional_otimo": POP_OTIMA_REFERENCIA,
+            "criterio_contiguidade": True,
             "territorios": territorios,
         },
         "mapa_unificado": {

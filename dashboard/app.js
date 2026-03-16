@@ -312,6 +312,7 @@ const estado = {
   climaVariavelAtual: "precipitacao",
   climaUfAtual: "BRASIL",
   codigoSelecionado: null,
+  municipiosDestacadosPrograma: [],
   buscaTerritoriosPrograma: "",
   paginaTerritoriosPrograma: 1,
   itensPorPaginaTerritoriosPrograma: 15,
@@ -640,9 +641,15 @@ function renderizarMapaUnificadoPrograma(territorios) {
   elementos.mapaPrograma.innerHTML = "";
   elementos.mapaPrograma.setAttribute("viewBox", `0 0 ${estado.metadata.mapa.largura} ${estado.metadata.mapa.altura}`);
   const namespace = "http://www.w3.org/2000/svg";
+  const grupoRaiz = document.createElementNS(namespace, "g");
+  grupoRaiz.setAttribute("id", "grupo-mapa-programa-root");
   const grupo = document.createElementNS(namespace, "g");
   grupo.setAttribute("id", "grupo-mapa-programa");
-  elementos.mapaPrograma.appendChild(grupo);
+  const grupoOverlay = document.createElementNS(namespace, "g");
+  grupoOverlay.setAttribute("id", "grupo-mapa-programa-overlay");
+  grupoRaiz.appendChild(grupo);
+  grupoRaiz.appendChild(grupoOverlay);
+  elementos.mapaPrograma.appendChild(grupoRaiz);
   const escala = criarEscalaNumerica(
     territorios.map((item) => item.dependencia_media).filter(valorSignificativo),
     ["#dce5f0", "#7a99b9", "#214565"]
@@ -656,23 +663,46 @@ function renderizarMapaUnificadoPrograma(territorios) {
     path.setAttribute("stroke", "rgba(255,255,255,0.45)");
     path.setAttribute("stroke-width", "0.42");
     path.setAttribute("class", "municipality");
-    path.addEventListener("mouseenter", (evento) => exibirTooltipPrograma(evento, territorio));
+    path.addEventListener("mouseenter", (evento) => {
+      destacarMunicipiosDoTerritorio(territorio.municipios || []);
+      renderizarDestaqueProgramaNoMapaSimulado(territorio.municipios || []);
+      exibirTooltipPrograma(evento, territorio);
+    });
     path.addEventListener("mousemove", posicionarTooltipPrograma);
-    path.addEventListener("mouseleave", ocultarTooltipPrograma);
+    path.addEventListener("mouseleave", () => {
+      limparDestaqueMunicipiosPrograma();
+      limparDestaqueProgramaNoMapaSimulado();
+      ocultarTooltipPrograma();
+    });
     grupo.appendChild(path);
   });
-  habilitarNavegacaoMapa(elementos.mapaPrograma, "programa", "grupo-mapa-programa");
-  aplicarTransformacaoMapa("programa", "grupo-mapa-programa");
+  habilitarNavegacaoMapa(elementos.mapaPrograma, "programa", "grupo-mapa-programa-root");
+  aplicarTransformacaoMapa("programa", "grupo-mapa-programa-root");
 }
 
 function exibirTooltipPrograma(evento, territorio) {
+  const municipios = (territorio.municipios || [])
+    .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
+    .filter(Boolean)
+    .join(", ");
   elementos.tooltipPrograma.classList.remove("hidden");
   elementos.tooltipPrograma.innerHTML = `
-    <strong>${territorio.nome}</strong><br />
-    ${formatarInteiro(territorio.populacao_total)} hab.<br />
-    ${territorio.quantidade_municipios} municípios<br />
-    Dependência média: ${formatarNumero(territorio.dependencia_media, 1)}%<br />
-    Status predominante: ${territorio.status_predominante}
+    <div class="tooltip-programa-card">
+      <div class="tooltip-programa-topo">
+        <strong>${territorio.nome}</strong>
+        <span>${territorio.uf}</span>
+      </div>
+      <div class="tooltip-programa-metricas">
+        <div><span>População</span><strong>${formatarInteiro(territorio.populacao_total)} hab.</strong></div>
+        <div><span>Municípios</span><strong>${territorio.quantidade_municipios}</strong></div>
+        <div><span>Dependência média</span><strong>${formatarNumero(territorio.dependencia_media, 1)}%</strong></div>
+        <div><span>Status predominante</span><strong>${territorio.status_predominante}</strong></div>
+      </div>
+      <div class="tooltip-programa-lista">
+        <span>Municípios englobados</span>
+        <small>${municipios || "Sem detalhamento nominal disponível."}</small>
+      </div>
+    </div>
   `;
   posicionarTooltipPrograma(evento);
 }
@@ -695,6 +725,46 @@ function ocultarTooltipPrograma() {
 
 function ocultarTooltipClima() {
   elementos.tooltipClima.classList.add("hidden");
+}
+
+function destacarMunicipiosDoTerritorio(codigos) {
+  estado.municipiosDestacadosPrograma = [...codigos];
+  atualizarDestaqueMunicipiosPrograma();
+}
+
+function limparDestaqueMunicipiosPrograma() {
+  estado.municipiosDestacadosPrograma = [];
+  atualizarDestaqueMunicipiosPrograma();
+}
+
+function atualizarDestaqueMunicipiosPrograma() {
+  const caminhos = elementos.mapa.querySelectorAll("path[data-code]");
+  caminhos.forEach((caminho) => {
+    caminho.classList.toggle("aggregate-highlight", estado.municipiosDestacadosPrograma.includes(caminho.dataset.code));
+  });
+}
+
+function renderizarDestaqueProgramaNoMapaSimulado(codigos) {
+  const grupoOverlay = document.getElementById("grupo-mapa-programa-overlay");
+  if (!grupoOverlay) return;
+  grupoOverlay.innerHTML = "";
+  const caminhosAno = estado.caminhosPorAno[String(estado.programaReforma?.mapa_unificado?.ano_referencia || estado.anoAtual)] || [];
+  const caminhosPorCodigo = new Map(caminhosAno.map((item) => [item.codigo_ibge, item]));
+  const namespace = "http://www.w3.org/2000/svg";
+
+  codigos.forEach((codigo) => {
+    const feature = caminhosPorCodigo.get(codigo);
+    if (!feature) return;
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("d", feature.caminho_svg);
+    path.setAttribute("class", "programa-overlay-municipio");
+    grupoOverlay.appendChild(path);
+  });
+}
+
+function limparDestaqueProgramaNoMapaSimulado() {
+  const grupoOverlay = document.getElementById("grupo-mapa-programa-overlay");
+  if (grupoOverlay) grupoOverlay.innerHTML = "";
 }
 
 function preencherControles() {
@@ -913,9 +983,15 @@ function renderizarMapa(caminhos, mapaLinhas) {
     const linha = mapaLinhas.get(feature.codigo_ibge);
     const visivel = Boolean(linha);
     const cor = linha ? obterCor(linha, metrica, escalaNumerica) : "#d9ddd9";
+    const destacadoPrograma = estado.municipiosDestacadosPrograma.includes(feature.codigo_ibge);
     path.setAttribute("d", feature.caminho_svg);
     path.setAttribute("fill", cor);
-    path.setAttribute("class", `municipality${visivel ? "" : " dimmed"}${estado.codigoSelecionado === feature.codigo_ibge ? " highlighted" : ""}`);
+    path.setAttribute(
+      "class",
+      `municipality${visivel ? "" : " dimmed"}${estado.codigoSelecionado === feature.codigo_ibge ? " highlighted" : ""}${
+        destacadoPrograma ? " aggregate-highlight" : ""
+      }`
+    );
     if (visivel) {
       path.dataset.code = feature.codigo_ibge;
       path.addEventListener("mouseenter", (evento) => exibirTooltip(evento, linha));

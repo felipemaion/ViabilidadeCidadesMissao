@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "build_dashboard_data.py"
+PROGRAM_SCRIPT_PATH = ROOT / "scripts" / "build_programa_reforma.py"
 METADATA_PATH = ROOT / "dashboard" / "data" / "metadata.json"
 LINHAS_PATH = ROOT / "dashboard" / "data" / "municipality_data.json"
 MAPA_PATH = ROOT / "dashboard" / "data" / "map_paths_by_year.json"
@@ -29,6 +30,14 @@ def carregar_builder():
     return modulo
 
 
+def carregar_builder_programa():
+    spec = importlib.util.spec_from_file_location("build_programa_reforma", PROGRAM_SCRIPT_PATH)
+    modulo = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
 class BaseDashboardTest(unittest.TestCase):
     _cache_pronto = False
 
@@ -36,6 +45,7 @@ class BaseDashboardTest(unittest.TestCase):
     def setUpClass(cls):
         if not BaseDashboardTest._cache_pronto:
             BaseDashboardTest.builder = carregar_builder()
+            BaseDashboardTest.builder_programa = carregar_builder_programa()
             BaseDashboardTest.builder.main()
             BaseDashboardTest.metadata = json.loads(METADATA_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.linhas = json.loads(LINHAS_PATH.read_text(encoding="utf-8"))
@@ -50,6 +60,7 @@ class BaseDashboardTest(unittest.TestCase):
             BaseDashboardTest.vercel = json.loads(VERCEL_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest._cache_pronto = True
         cls.builder = BaseDashboardTest.builder
+        cls.builder_programa = BaseDashboardTest.builder_programa
         cls.metadata = BaseDashboardTest.metadata
         cls.linhas = BaseDashboardTest.linhas
         cls.mapa = BaseDashboardTest.mapa
@@ -405,6 +416,13 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("programa-ordenar-populacao", self.index_html)
         self.assertIn("ordenarTerritoriosMapaUnificado", self.app_js)
         self.assertIn('ordenacaoTerritoriosPrograma: { chave: "nome", direcao: "asc" }', self.app_js)
+        self.assertIn("tooltip-programa-lista", self.app_js)
+        self.assertIn("Municípios englobados", self.app_js)
+        self.assertIn("destacarMunicipiosDoTerritorio", self.app_js)
+        self.assertIn("aggregate-highlight", self.app_js)
+        self.assertIn("grupo-mapa-programa-overlay", self.app_js)
+        self.assertIn("renderizarDestaqueProgramaNoMapaSimulado", self.app_js)
+        self.assertIn("programa-overlay-municipio", self.app_js)
 
 
 class TestProgramaReforma(BaseDashboardTest):
@@ -419,6 +437,7 @@ class TestProgramaReforma(BaseDashboardTest):
     def test_programa_reforma_tem_territorios_preliminares(self):
         territorios = self.programa["territorios_identidade"]["territorios"]
         self.assertGreater(len(territorios), 20)
+        self.assertTrue(self.programa["territorios_identidade"]["criterio_contiguidade"])
         amostra = territorios[0]
         self.assertIn("id", amostra)
         self.assertIn("uf", amostra)
@@ -463,6 +482,28 @@ class TestProgramaReforma(BaseDashboardTest):
         territorios = self.programa["mapa_unificado"]["territorios"]
         ordenados = sorted(territorios, key=lambda item: item["populacao_total"], reverse=True)
         self.assertGreaterEqual(ordenados[0]["populacao_total"], ordenados[1]["populacao_total"])
+
+    def test_territorios_preliminares_formam_componentes_contiguos(self):
+        rows_latest, _ = self.builder_programa.build_latest_rows()
+        codes_by_uf = {}
+        for row in rows_latest:
+            codes_by_uf.setdefault(row["uf"], set()).add(row["codigo_ibge"])
+        adjacency = self.builder_programa.build_adjacency_map(codes_by_uf)
+        territorios = self.programa["territorios_identidade"]["territorios"][:120]
+        for territorio in territorios:
+            codigos = territorio["municipios"]
+            if len(codigos) <= 1:
+                continue
+            visitados = set()
+            fronteira = [codigos[0]]
+            conjunto = set(codigos)
+            while fronteira:
+                atual = fronteira.pop()
+                if atual in visitados:
+                    continue
+                visitados.add(atual)
+                fronteira.extend((adjacency.get(atual, set()) & conjunto) - visitados)
+            self.assertEqual(conjunto, visitados, territorio["id"])
 
     def test_cenarios_prioritarios_priorizam_status_conhecido(self):
         prioritarios = self.programa["cenarios_amalgama"]["municipios_prioritarios"][:10]
