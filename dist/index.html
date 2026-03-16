@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Painel Cidades Missão</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Painel territorial dos municípios brasileiros</p>
+          <h1>Viabilidade municipal, autonomia fiscal e dependência de transferências em um único mapa.</h1>
+          <p class="hero-text" id="resumo-cartilha"></p>
+        </div>
+        <div class="hero-stats">
+          <div class="stat-card">
+            <span class="stat-label">Linhas carregadas</span>
+            <strong id="total-linhas">-</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Última referência do Bolsa Família</span>
+            <strong id="referencia-bolsa">-</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Cobertura geográfica</span>
+            <strong id="cobertura-geografica">-</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel panel-map">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Explorador cartográfico</p>
+              <h2>Mapa coroplético municipal do Brasil</h2>
+            </div>
+            <div class="filters">
+              <label>
+                Métrica
+                <select id="seletor-metrica"></select>
+              </label>
+              <label>
+                Ano
+                <select id="seletor-ano"></select>
+              </label>
+              <label>
+                UF
+                <select id="seletor-uf"></select>
+              </label>
+              <label>
+                Região
+                <select id="seletor-regiao"></select>
+              </label>
+              <label>
+                Faixa populacional
+                <select id="seletor-faixa-populacional"></select>
+              </label>
+              <label>
+                Status de viabilidade
+                <select id="seletor-status"></select>
+              </label>
+            </div>
+          </div>
+          <div class="metrica-resumo">
+            <div class="metrica-card destaque">
+              <p class="section-kicker">Métrica ativa</p>
+              <h3 id="titulo-metrica">-</h3>
+              <div id="descricao-metrica" class="detail-copy"></div>
+            </div>
+            <div class="metrica-card">
+              <p class="section-kicker">Base de dados</p>
+              <div id="fonte-metrica" class="detail-copy"></div>
+            </div>
+            <div class="metrica-card">
+              <p class="section-kicker">O que entra no cálculo</p>
+              <div id="criterios-metrica" class="detail-copy"></div>
+            </div>
+            <div class="metrica-card">
+              <p class="section-kicker">Como interpretar</p>
+              <div id="interpretacao-metrica" class="detail-copy"></div>
+            </div>
+          </div>
+          <div class="map-shell">
+            <div class="map-frame">
+              <button id="resetar-mapa" class="botao-mapa" type="button">Resetar mapa</button>
+              <svg id="mapa-svg" aria-label="Mapa municipal do Brasil"></svg>
+              <div id="tooltip-mapa" class="tooltip hidden"></div>
+            </div>
+            <div class="legenda-mapa">
+              <div class="titulo-legenda" id="titulo-legenda">Legenda</div>
+              <div class="escala-legenda" id="escala-legenda"></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel panel-sidebar">
+          <div class="sidebar-block">
+            <p class="section-kicker">Detalhe do município</p>
+            <h2 id="titulo-detalhe">Selecione um município no mapa</h2>
+            <p id="subtitulo-detalhe" class="muted">O painel lateral será atualizado quando você clicar em uma cidade.</p>
+            <div class="bloco-explicativo">
+              <h3>Como este detalhe foi montado</h3>
+              <p id="explicacao-detalhe" class="detail-copy"></p>
+            </div>
+            <dl class="detail-grid" id="grade-detalhe"></dl>
+            <div class="comparacao-box">
+              <h3>Comparação com o filtro atual</h3>
+              <div id="comparacao-detalhe" class="comparacao-grid"></div>
+            </div>
+            <p class="detail-copy" id="interpretacao-detalhe"></p>
+          </div>
+        </aside>
+
+        <section class="panel panel-charts">
+          <div class="panel-header compact">
+            <div>
+              <p class="section-kicker">Comparativos filtrados</p>
+              <h2>Ranking, distribuição, médias regionais e leitura do filtro</h2>
+            </div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3>Maiores valores na métrica selecionada</h3>
+              <div id="grafico-top" class="bar-chart"></div>
+            </div>
+            <div class="chart-card">
+              <h3>Distribuição do status de viabilidade no filtro atual</h3>
+              <div id="grafico-status" class="stack-chart"></div>
+            </div>
+            <div class="chart-card">
+              <h3>Média da métrica por região</h3>
+              <div id="grafico-regioes" class="bar-chart"></div>
+            </div>
+            <div class="chart-card">
+              <h3>Leitura do filtro atual</h3>
+              <div id="grafico-faixas" class="bar-chart"></div>
+            </div>
+            <div class="chart-card">
+              <h3>Insights automáticos</h3>
+              <div id="insights-automaticos" class="bar-chart"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel panel-clima">
+          <div class="panel-header compact">
+            <div>
+              <p class="section-kicker">Climatologia</p>
+              <h2>Leitura climática por estação e por UF</h2>
+              <p id="escopo-clima" class="muted"></p>
+            </div>
+            <div class="filters clima-filtros">
+              <label>
+                Variável climática
+                <select id="seletor-clima-variavel"></select>
+              </label>
+              <label>
+                UF da climatologia
+                <select id="seletor-clima-uf"></select>
+              </label>
+            </div>
+          </div>
+          <div class="metrica-resumo clima-resumo">
+            <div class="metrica-card destaque">
+              <p class="section-kicker">Fonte climática</p>
+              <p id="fonte-clima" class="detail-copy"></p>
+            </div>
+            <div class="metrica-card">
+              <p class="section-kicker">Cobertura</p>
+              <p id="cobertura-clima" class="detail-copy"></p>
+            </div>
+            <div class="metrica-card">
+              <p class="section-kicker">Como ler</p>
+              <p id="explicacao-clima" class="detail-copy"></p>
+            </div>
+            <div class="metrica-card">
+              <p class="section-kicker">Conclusão rápida</p>
+              <p id="insight-clima" class="detail-copy"></p>
+            </div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3>Mapa climático por UF</h3>
+              <div class="map-frame map-frame-clima">
+                <svg id="mapa-clima-svg" aria-label="Mapa climático por UF"></svg>
+              </div>
+            </div>
+            <div class="chart-card">
+              <h3>Sazonalidade mensal</h3>
+              <div id="grafico-clima-mensal" class="bar-chart"></div>
+            </div>
+            <div class="chart-card">
+              <h3>Média anual por UF</h3>
+              <div id="grafico-clima-ufs" class="bar-chart"></div>
+            </div>
+            <div class="chart-card">
+              <h3>Ranking de estações</h3>
+              <div id="grafico-clima-estacoes" class="bar-chart"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel panel-cartilhas">
+          <div class="panel-header compact">
+            <div>
+              <p class="section-kicker">Leitura das cartilhas</p>
+              <h2>Resumo, mudanças e implicações das duas etapas</h2>
+              <p id="resumo-cartilhas-bloco" class="muted"></p>
+            </div>
+          </div>
+          <div class="cartilhas-grid">
+            <article class="chart-card cartilha-card">
+              <p class="section-kicker">Cartilha 1</p>
+              <h3 id="cartilha-1-titulo">-</h3>
+              <p id="cartilha-1-foco" class="muted"></p>
+              <div id="cartilha-1-resumo" class="detail-copy"></div>
+              <ul id="cartilha-1-temas" class="theme-list"></ul>
+              <div class="cartilha-meta">
+                <span>Arquivo</span>
+                <strong id="cartilha-1-arquivo">-</strong>
+              </div>
+              <blockquote id="cartilha-1-trecho" class="doc-excerpt"></blockquote>
+            </article>
+            <article class="chart-card cartilha-card">
+              <p class="section-kicker">Cartilha 2</p>
+              <h3 id="cartilha-2-titulo">-</h3>
+              <p id="cartilha-2-foco" class="muted"></p>
+              <div id="cartilha-2-resumo" class="detail-copy"></div>
+              <ul id="cartilha-2-temas" class="theme-list"></ul>
+              <div class="cartilha-meta">
+                <span>Arquivo</span>
+                <strong id="cartilha-2-arquivo">-</strong>
+              </div>
+              <blockquote id="cartilha-2-trecho" class="doc-excerpt"></blockquote>
+            </article>
+            <article class="chart-card">
+              <p class="section-kicker">O que mudou</p>
+              <h3>Novas ideias e leituras incorporadas</h3>
+              <ul id="lista-mudancas-cartilha" class="theme-list"></ul>
+            </article>
+            <article class="chart-card">
+              <p class="section-kicker">Implementação no painel</p>
+              <h3>Como as cartilhas aparecem no dashboard</h3>
+              <ul id="lista-implementacoes-cartilha" class="theme-list"></ul>
+            </article>
+            <article class="chart-card">
+              <p class="section-kicker">Critérios territoriais</p>
+              <h3>Como interpretar os dados para decisão</h3>
+              <ul id="lista-criterios-cartilha" class="theme-list"></ul>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="tooltip-ajuda" class="tooltip tooltip-ajuda hidden"></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
