@@ -206,12 +206,14 @@ const elementos = {
   cartilha1Resumo: document.getElementById("cartilha-1-resumo"),
   cartilha1Temas: document.getElementById("cartilha-1-temas"),
   cartilha1Arquivo: document.getElementById("cartilha-1-arquivo"),
+  cartilha1Link: document.getElementById("cartilha-1-link"),
   cartilha1Trecho: document.getElementById("cartilha-1-trecho"),
   cartilha2Titulo: document.getElementById("cartilha-2-titulo"),
   cartilha2Foco: document.getElementById("cartilha-2-foco"),
   cartilha2Resumo: document.getElementById("cartilha-2-resumo"),
   cartilha2Temas: document.getElementById("cartilha-2-temas"),
   cartilha2Arquivo: document.getElementById("cartilha-2-arquivo"),
+  cartilha2Link: document.getElementById("cartilha-2-link"),
   cartilha2Trecho: document.getElementById("cartilha-2-trecho"),
   listaMudancasCartilha: document.getElementById("lista-mudancas-cartilha"),
   listaImplementacoesCartilha: document.getElementById("lista-implementacoes-cartilha"),
@@ -317,6 +319,7 @@ function renderizarCartilhas(narrativa) {
     resumo: elementos.cartilha1Resumo,
     temas: elementos.cartilha1Temas,
     arquivo: elementos.cartilha1Arquivo,
+    link: elementos.cartilha1Link,
     trecho: elementos.cartilha1Trecho,
   });
   preencherCardCartilha(cartilha2, {
@@ -325,6 +328,7 @@ function renderizarCartilhas(narrativa) {
     resumo: elementos.cartilha2Resumo,
     temas: elementos.cartilha2Temas,
     arquivo: elementos.cartilha2Arquivo,
+    link: elementos.cartilha2Link,
     trecho: elementos.cartilha2Trecho,
   });
   preencherLista(elementos.listaMudancasCartilha, narrativa.comparativo.o_que_mudou);
@@ -337,8 +341,20 @@ function preencherCardCartilha(cartilha, elementosCard) {
   elementosCard.foco.textContent = cartilha.foco;
   elementosCard.resumo.textContent = cartilha.resumo;
   elementosCard.arquivo.textContent = cartilha.arquivo;
+  if (elementosCard.link) {
+    elementosCard.link.href = obterLinkCartilha(cartilha.id);
+    elementosCard.link.setAttribute("download", cartilha.arquivo);
+  }
   elementosCard.trecho.textContent = cartilha.trecho;
   preencherLista(elementosCard.temas, cartilha.temas);
+}
+
+function obterLinkCartilha(cartilhaId) {
+  const links = {
+    primeira_etapa: "./assets/documentos/cartilha-reducao-municipios-primeira-etapa.docx",
+    segunda_etapa: "./assets/documentos/cartilha-reducao-municipios-segunda-etapa.docx",
+  };
+  return links[cartilhaId] || "#";
 }
 
 function preencherLista(elemento, itens) {

@@ -432,10 +432,40 @@ select {
   color: var(--muted);
 }
 
+.cartilha-meta span,
+.cartilha-meta strong {
+  display: block;
+}
+
+.cartilha-meta span {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
 .cartilha-meta strong {
   color: var(--ink);
   font-size: 0.92rem;
   overflow-wrap: anywhere;
+}
+
+.botao-download {
+  align-self: center;
+  white-space: nowrap;
+  text-decoration: none;
+  color: #f8f5ee;
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.botao-download:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
 }
 
 .doc-excerpt {
@@ -551,6 +581,18 @@ select {
   line-height: 1.5;
 }
 
+.site-footer {
+  padding: 22px 6px 6px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.site-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
 @media (max-width: 1180px) {
   .hero,
   .layout {
@@ -589,5 +631,10 @@ select {
   .bar-row,
   .stack-row {
     grid-template-columns: 1fr;
+  }
+
+  .cartilha-meta {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
