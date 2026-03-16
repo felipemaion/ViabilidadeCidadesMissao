@@ -120,6 +120,7 @@ h1 {
     "map sidebar"
     "charts sidebar"
     "clima sidebar"
+    "programa programa"
     "cartilhas cartilhas";
   gap: 18px;
 }
@@ -142,6 +143,10 @@ h1 {
 
 .panel-clima {
   grid-area: clima;
+}
+
+.panel-programa {
+  grid-area: programa;
 }
 
 .panel-cartilhas {
@@ -251,6 +256,10 @@ select {
 }
 
 .clima-resumo {
+  margin-bottom: 20px;
+}
+
+.programa-resumo {
   margin-bottom: 20px;
 }
 
@@ -581,6 +590,31 @@ select {
   line-height: 1.5;
 }
 
+.programa-card {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(29, 107, 82, 0.06);
+  min-width: 0;
+}
+
+.programa-card strong,
+.programa-card span,
+.programa-card small {
+  display: block;
+}
+
+.programa-card span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+}
+
+.programa-card small {
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.45;
+}
+
 .site-footer {
   padding: 22px 6px 6px;
   text-align: center;
@@ -602,6 +636,7 @@ select {
       "sidebar"
       "charts"
       "clima"
+      "programa"
       "cartilhas";
   }
 

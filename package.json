@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build-data": "python3 scripts/build_dashboard_data.py",
+    "build-programa": "python3 scripts/build_programa_reforma.py",
     "preparar-publicacao": "python3 scripts/prepare_static_publish.py",
     "serve": "python3 -m http.server 4173 -d dashboard",
     "test": "python3 -m unittest discover -s tests -v"

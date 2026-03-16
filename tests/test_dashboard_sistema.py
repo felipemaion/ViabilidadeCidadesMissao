@@ -12,6 +12,7 @@ METADATA_PATH = ROOT / "dashboard" / "data" / "metadata.json"
 LINHAS_PATH = ROOT / "dashboard" / "data" / "municipality_data.json"
 MAPA_PATH = ROOT / "dashboard" / "data" / "map_paths_by_year.json"
 CLIMA_PATH = ROOT / "dashboard" / "data" / "climatologia.json"
+PROGRAMA_PATH = ROOT / "dashboard" / "data" / "programa_reforma.json"
 INDEX_PATH = ROOT / "dashboard" / "index.html"
 APP_PATH = ROOT / "dashboard" / "app.js"
 README_PATH = ROOT / "README.md"
@@ -40,6 +41,7 @@ class BaseDashboardTest(unittest.TestCase):
             BaseDashboardTest.linhas = json.loads(LINHAS_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.mapa = json.loads(MAPA_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.clima = json.loads(CLIMA_PATH.read_text(encoding="utf-8"))
+            BaseDashboardTest.programa = json.loads(PROGRAMA_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.index_html = INDEX_PATH.read_text(encoding="utf-8")
             BaseDashboardTest.app_js = APP_PATH.read_text(encoding="utf-8")
             BaseDashboardTest.readme = README_PATH.read_text(encoding="utf-8")
@@ -52,6 +54,7 @@ class BaseDashboardTest(unittest.TestCase):
         cls.linhas = BaseDashboardTest.linhas
         cls.mapa = BaseDashboardTest.mapa
         cls.clima = BaseDashboardTest.clima
+        cls.programa = BaseDashboardTest.programa
         cls.index_html = BaseDashboardTest.index_html
         cls.app_js = BaseDashboardTest.app_js
         cls.readme = BaseDashboardTest.readme
@@ -67,7 +70,7 @@ class TestOrganizacaoDeArquivos(BaseDashboardTest):
             "07.03_indicadores_base_completa_20260217.xlsx",
             "CNES_saude_estabelecimentos.xlsx",
             "CNES_saude_leitos.xlsx",
-            "Cartilha - Redução dos Municípios.docx",
+            "Cartilha - Redução dos Municípios.docx",
             "Cartilha de Redução de Municípios - Segunda Etapa.docx",
             "IBGE 2026.xlsx",
             "Normal-Climatologica-PREC.xlsx",
@@ -135,6 +138,7 @@ class TestContratosDosArtefatos(BaseDashboardTest):
         self.assertTrue(LINHAS_PATH.exists())
         self.assertTrue(MAPA_PATH.exists())
         self.assertTrue(CLIMA_PATH.exists())
+        self.assertTrue(PROGRAMA_PATH.exists())
 
     def test_metadata_tem_contrato_em_portugues(self):
         self.assertIn("mapa", self.metadata)
@@ -339,6 +343,9 @@ class TestFrontendEmPortugues(BaseDashboardTest):
             "Variável climática",
             "Mapa climático por UF",
             "Resumo, mudanças e implicações das duas etapas",
+            "Programa de reforma municipal",
+            "Territórios preliminares propostos",
+            "Arquitetura legal e transição",
         ]
         for termo in obrigatorios:
             self.assertIn(termo, self.index_html)
@@ -360,12 +367,41 @@ class TestFrontendEmPortugues(BaseDashboardTest):
             "renderizarClima",
             "renderizarMapaClimatico",
             "renderizarCartilhas",
+            "renderizarProgramaReforma",
             "resetar-mapa",
             "ajuda-indicador",
             "tooltip-ajuda",
         ]
         for termo in termos:
             self.assertIn(termo, self.app_js)
+
+
+class TestProgramaReforma(BaseDashboardTest):
+    def test_programa_reforma_tem_blocos_essenciais(self):
+        self.assertIn("visao_geral", self.programa)
+        self.assertIn("territorios_identidade", self.programa)
+        self.assertIn("cenarios_amalgama", self.programa)
+        self.assertIn("arquitetura_legal", self.programa)
+        self.assertIn("lrg_conceitual", self.programa)
+
+    def test_programa_reforma_tem_territorios_preliminares(self):
+        territorios = self.programa["territorios_identidade"]["territorios"]
+        self.assertGreater(len(territorios), 20)
+        amostra = territorios[0]
+        self.assertIn("id", amostra)
+        self.assertIn("uf", amostra)
+        self.assertIn("municipios", amostra)
+        self.assertIn("populacao_total", amostra)
+
+    def test_programa_reforma_declara_ifdm_com_status_metodologico(self):
+        ifdm = self.programa["visao_geral"]["ifdm"]
+        self.assertIn(ifdm["status"], {"pendente_integracao_verificada", "integrado"})
+        self.assertIn("verificada", ifdm["observacao"])
+
+    def test_lrg_fica_marcada_como_conceitual(self):
+        lrg = self.programa["lrg_conceitual"]
+        self.assertEqual("em_analise_pela_equipe", lrg["status"])
+        self.assertIn("conceitual", lrg["aviso"].lower())
 
 
 class TestClimatologia(BaseDashboardTest):

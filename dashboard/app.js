@@ -241,6 +241,17 @@ const elementos = {
   fonteMetrica: document.getElementById("fonte-metrica"),
   criteriosMetrica: document.getElementById("criterios-metrica"),
   interpretacaoMetrica: document.getElementById("interpretacao-metrica"),
+  programaResumo: document.getElementById("programa-resumo"),
+  programaMensagem: document.getElementById("programa-mensagem"),
+  programaParametro: document.getElementById("programa-parametro"),
+  programaIfdm: document.getElementById("programa-ifdm"),
+  programaLrg: document.getElementById("programa-lrg"),
+  programaEixos: document.getElementById("programa-eixos"),
+  programaMetodologia: document.getElementById("programa-metodologia"),
+  programaTerritorios: document.getElementById("programa-territorios"),
+  programaCenarios: document.getElementById("programa-cenarios"),
+  programaLegal: document.getElementById("programa-legal"),
+  programaLrgPrincipios: document.getElementById("programa-lrg-principios"),
 };
 
 const estado = {
@@ -248,6 +259,7 @@ const estado = {
   linhas: [],
   caminhosPorAno: {},
   climatologia: null,
+  programaReforma: null,
   metricaAtual: "status_viabilidade",
   anoAtual: null,
   ufAtual: "TODAS",
@@ -266,17 +278,19 @@ inicializar().catch((erro) => {
 });
 
 async function inicializar() {
-  const [metadata, linhas, caminhos, climatologia] = await Promise.all([
+  const [metadata, linhas, caminhos, climatologia, programaReforma] = await Promise.all([
     buscarJson("./data/metadata.json"),
     buscarJson("./data/municipality_data.json"),
     buscarJson("./data/map_paths_by_year.json"),
     buscarJson("./data/climatologia.json"),
+    buscarJson("./data/programa_reforma.json"),
   ]);
 
   estado.metadata = metadata;
   estado.linhas = linhas;
   estado.caminhosPorAno = caminhos;
   estado.climatologia = climatologia;
+  estado.programaReforma = programaReforma;
   estado.anoAtual = String(metadata.filtros.anos.at(-1));
 
   prepararMapa();
@@ -309,6 +323,7 @@ function preencherResumo() {
   const cobertura = ((metadata.qualidade.municipios_com_geometria / new Set(linhas.map((linha) => linha.codigo_ibge)).size) * 100).toFixed(1);
   elementos.coberturaGeografica.textContent = `${cobertura}%`;
   elementos.escopoClima.textContent = estado.climatologia.escopo;
+  renderizarProgramaReforma();
 }
 
 function renderizarCartilhas(narrativa) {
@@ -334,6 +349,29 @@ function renderizarCartilhas(narrativa) {
   preencherLista(elementos.listaMudancasCartilha, narrativa.comparativo.o_que_mudou);
   preencherLista(elementos.listaImplementacoesCartilha, narrativa.comparativo.implementado_no_dashboard);
   preencherLista(elementos.listaCriteriosCartilha, narrativa.comparativo.criterios_territoriais);
+}
+
+function renderizarProgramaReforma() {
+  const programa = estado.programaReforma;
+  if (!programa) return;
+  elementos.programaResumo.textContent =
+    "Camada programática separada do diagnóstico, com metodologia preliminar, cenários iniciais e arquitetura legal em curadoria.";
+  elementos.programaMensagem.textContent = programa.visao_geral.mensagem_programatica;
+  elementos.programaParametro.textContent = `Referência inicial de ${formatarInteiro(
+    programa.territorios_identidade.parametro_populacional_referencia
+  )} habitantes por amálgama, com alvo ótimo de ${formatarInteiro(
+    programa.territorios_identidade.parametro_populacional_otimo
+  )} habitantes e possibilidade de recalibração.`;
+  elementos.programaIfdm.textContent = `${programa.visao_geral.ifdm.status.replaceAll("_", " ")}. ${programa.visao_geral.ifdm.observacao}`;
+  elementos.programaLrg.textContent = `${programa.lrg_conceitual.status.replaceAll("_", " ")}. ${programa.lrg_conceitual.aviso}`;
+
+  preencherLista(elementos.programaEixos, programa.visao_geral.eixos);
+  preencherLista(elementos.programaMetodologia, programa.territorios_identidade.metodologia);
+  preencherLista(elementos.programaLrgPrincipios, programa.lrg_conceitual.principios_sugeridos);
+
+  renderizarTerritoriosPrograma(programa.territorios_identidade.territorios);
+  renderizarCenariosPrograma(programa.cenarios_amalgama.municipios_prioritarios);
+  renderizarArquiteturaLegal(programa.arquitetura_legal.eixos);
 }
 
 function preencherCardCartilha(cartilha, elementosCard) {
@@ -365,6 +403,66 @@ function preencherLista(elemento, itens) {
     item.textContent = texto;
     elemento.appendChild(item);
   });
+}
+
+function renderizarTerritoriosPrograma(territorios) {
+  elementos.programaTerritorios.innerHTML = "";
+  territorios
+    .slice(0, 12)
+    .forEach((territorio) => {
+      const nomesMunicipios = territorio.municipios
+        .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
+        .filter(Boolean)
+        .join(", ");
+      const card = document.createElement("div");
+      card.className = "programa-card";
+      card.innerHTML = `
+        <span>${territorio.nome}</span>
+        <strong>${formatarInteiro(territorio.populacao_total)} hab. · ${territorio.quantidade_municipios} municípios</strong>
+        <small>Autonomia média: ${formatarNumero(territorio.autonomia_media, 2)} · Dependência média: ${formatarNumero(
+          territorio.dependencia_media,
+          1
+        )}% · Status predominante: ${territorio.status_predominante}</small>
+        <small>Municípios: ${nomesMunicipios || "Sem detalhamento nominal disponível."}</small>
+      `;
+      elementos.programaTerritorios.appendChild(card);
+    });
+}
+
+function renderizarCenariosPrograma(municipios) {
+  elementos.programaCenarios.innerHTML = "";
+  municipios.slice(0, 10).forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "programa-card";
+    card.innerHTML = `
+      <span>${item.nome_municipio} (${item.uf})</span>
+      <strong>Score ${formatarNumero(item.score_prioridade, 3)} · ${item.status_viabilidade || "Sem dado"}</strong>
+      <small>População: ${formatarInteiro(item.populacao)} · Dependência: ${formatarNumero(
+        item.pct_dependencia_transf,
+        1
+      )}% · Autonomia: ${formatarNumero(item.autonomia_fiscal, 2)}</small>
+    `;
+    elementos.programaCenarios.appendChild(card);
+  });
+}
+
+function renderizarArquiteturaLegal(eixos) {
+  elementos.programaLegal.innerHTML = "";
+  eixos.forEach((eixo) => {
+    const card = document.createElement("div");
+    card.className = "programa-card";
+    card.innerHTML = `
+      <span>${eixo.status.replaceAll("_", " ")}</span>
+      <strong>${eixo.titulo}</strong>
+      <small>Verificação oficial: ${eixo.verificacao_oficial.replaceAll("_", " ")}</small>
+    `;
+    elementos.programaLegal.appendChild(card);
+  });
+}
+
+function obterNomeMunicipioPorCodigo(codigoIbge) {
+  const linha = estado.linhas.find((item) => String(item.ano) === estado.anoAtual && item.codigo_ibge === codigoIbge);
+  return linha ? `${linha.nome_municipio} (${linha.uf})` : codigoIbge;
 }
 
 function preencherControles() {
