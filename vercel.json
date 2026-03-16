@@ -7,8 +7,8 @@
       "destination": "/dashboard/"
     },
     {
-      "source": "/(.*)",
-      "destination": "/dashboard/$1"
+      "source": "/:path((?!api/).*)",
+      "destination": "/dashboard/:path"
     }
   ]
 }

@@ -166,6 +166,7 @@ def build_territories(rows):
                     "autonomia_media": round(mean([row.get("autonomia_fiscal") for row in lote]) or 0, 3),
                     "dependencia_media": round(mean([row.get("pct_dependencia_transf") for row in lote]) or 0, 3),
                     "ifdm_medio": round(mean([row.get("ifdm_geral") for row in lote]) or 0, 3),
+                    "receita_total_bruta_total": sum((row.get("receita_total_bruta") or 0) for row in lote),
                     "bolsa_familia_total": sum((row.get("bolsa_familia_total") or 0) for row in lote),
                     "status_predominante": status_predominante(lote),
                     "alinhamento_populacional": "acima_da_referencia"
@@ -365,6 +366,7 @@ def build_unified_map(territorios, rows):
                 "autonomia_media": territorio["autonomia_media"],
                 "dependencia_media": territorio["dependencia_media"],
                 "ifdm_medio": territorio.get("ifdm_medio"),
+                "receita_total_bruta_total": territorio.get("receita_total_bruta_total"),
                 "status_predominante": territorio["status_predominante"],
                 "municipios": territorio["municipios"],
                 "caminho_svg": " ".join(caminhos),

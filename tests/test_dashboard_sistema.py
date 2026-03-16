@@ -20,6 +20,8 @@ README_PATH = ROOT / "README.md"
 PACKAGE_PATH = ROOT / "package.json"
 NETLIFY_PATH = ROOT / "netlify.toml"
 VERCEL_PATH = ROOT / "vercel.json"
+LOCAL_SERVER_PATH = ROOT / "scripts" / "serve_dashboard.py"
+API_TRIBUTOS_PATH = ROOT / "api" / "tributos.js"
 
 
 def carregar_builder():
@@ -47,6 +49,7 @@ class BaseDashboardTest(unittest.TestCase):
             BaseDashboardTest.builder = carregar_builder()
             BaseDashboardTest.builder_programa = carregar_builder_programa()
             BaseDashboardTest.builder.main()
+            BaseDashboardTest.builder_programa.main()
             BaseDashboardTest.metadata = json.loads(METADATA_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.linhas = json.loads(LINHAS_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.mapa = json.loads(MAPA_PATH.read_text(encoding="utf-8"))
@@ -152,6 +155,8 @@ class TestContratosDosArtefatos(BaseDashboardTest):
         self.assertTrue(MAPA_PATH.exists())
         self.assertTrue(CLIMA_PATH.exists())
         self.assertTrue(PROGRAMA_PATH.exists())
+        self.assertTrue(LOCAL_SERVER_PATH.exists())
+        self.assertTrue(API_TRIBUTOS_PATH.exists())
 
     def test_metadata_tem_contrato_em_portugues(self):
         self.assertIn("mapa", self.metadata)
@@ -423,6 +428,8 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("grupo-mapa-programa-overlay", self.app_js)
         self.assertIn("renderizarDestaqueProgramaNoMapaSimulado", self.app_js)
         self.assertIn("programa-overlay-municipio", self.app_js)
+        self.assertIn("/api/tributos", self.app_js)
+        self.assertIn("cacheTributosMunicipais", self.app_js)
 
 
 class TestProgramaReforma(BaseDashboardTest):
@@ -453,6 +460,7 @@ class TestProgramaReforma(BaseDashboardTest):
         self.assertIn(" Z", amostra["caminho_svg"])
         self.assertGreaterEqual(amostra["quantidade_municipios"], 1)
         self.assertEqual(len(amostra["centroide"]), 2)
+        self.assertIn("receita_total_bruta_total", amostra)
 
     def test_mapa_unificado_tem_populacao_brasil_consistente(self):
         territorios = self.programa["mapa_unificado"]["territorios"]
@@ -553,6 +561,7 @@ class TestDocumentacaoEOperacao(BaseDashboardTest):
         self.assertIn("preparar-publicacao", self.package["scripts"])
         self.assertIn("serve", self.package["scripts"])
         self.assertIn("test", self.package["scripts"])
+        self.assertIn("serve_dashboard.py", self.package["scripts"]["serve"])
 
     def test_readme_esta_em_portugues(self):
         self.assertIn("suíte automatizada", self.readme)
@@ -567,7 +576,7 @@ class TestDocumentacaoEOperacao(BaseDashboardTest):
         self.assertTrue(NETLIFY_PATH.exists())
         self.assertTrue(VERCEL_PATH.exists())
         self.assertIn("rewrites", self.vercel)
-        self.assertEqual("/dashboard/$1", self.vercel["rewrites"][1]["destination"])
+        self.assertEqual("/dashboard/:path", self.vercel["rewrites"][1]["destination"])
         self.assertIn('publish = "dist"', self.netlify)
 
     def test_metadados_declaram_fontes_em_portugues(self):

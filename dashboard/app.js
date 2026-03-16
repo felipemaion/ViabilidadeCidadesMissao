@@ -203,6 +203,7 @@ const explicacoesCampos = {
   "IFDM Emprego & renda": "Componente do IFDM relacionado a mercado de trabalho e renda.",
   "Ranking IFDM nacional": "Posição do município no ranking nacional do IFDM oficial da FIRJAN.",
   "Ranking IFDM estadual": "Posição do município no ranking estadual do IFDM oficial da FIRJAN.",
+  "Fonte dos tributos municipais": "Quando disponível, o painel substitui os tributos municipais por consulta oficial à API do Siconfi/Tesouro para o município e ano selecionados.",
 };
 
 const elementos = {
@@ -317,6 +318,8 @@ const estado = {
   paginaTerritoriosPrograma: 1,
   itensPorPaginaTerritoriosPrograma: 15,
   ordenacaoTerritoriosPrograma: { chave: "nome", direcao: "asc" },
+  cacheTributosMunicipais: {},
+  chaveTributosAtiva: null,
   mapaTransforms: {
     principal: { escala: 1, x: 0, y: 0 },
     clima: { escala: 1, x: 0, y: 0 },
@@ -697,6 +700,7 @@ function exibirTooltipPrograma(evento, territorio) {
         <div><span>Municípios</span><strong>${territorio.quantidade_municipios}</strong></div>
         <div><span>Dependência média</span><strong>${formatarNumero(territorio.dependencia_media, 1)}%</strong></div>
         <div><span>Status predominante</span><strong>${territorio.status_predominante}</strong></div>
+        <div><span>Receita total agregada</span><strong>${formatarMoeda(territorio.receita_total_bruta_total)}</strong></div>
       </div>
       <div class="tooltip-programa-lista">
         <span>Municípios englobados</span>
@@ -1118,6 +1122,7 @@ function renderizarDetalhe(linha, linhasFiltradas) {
   }
   estado.codigoSelecionado = linha.codigo_ibge;
   const metrica = definicoesMetricas[estado.metricaAtual];
+  const tributos = obterTributosMunicipais(linha);
   elementos.tituloDetalhe.textContent = `${linha.nome_municipio} (${linha.uf})`;
   elementos.subtituloDetalhe.textContent = `${linha.regiao || "Região indisponível"} · Ano ${linha.ano}`;
   elementos.explicacaoDetalhe.textContent = `${metrica.detalhe} Para viabilidade, o critério vem do campo já consolidado na planilha principal; o painel não inventa nem recalcula a regra.`;
@@ -1137,12 +1142,13 @@ function renderizarDetalhe(linha, linhasFiltradas) {
     ["Receita total líquida", formatarMoeda(linha.receita_total_liquida)],
     ["Receita corrente líquida", formatarMoeda(linha.receita_corrente_liquida)],
     ["Transferências totais", formatarMoeda(linha.transferencias_total)],
-    ["Receita tributária municipal", formatarMoeda(linha.receita_tributaria_mun)],
+    ["Receita tributária municipal", formatarMoeda(tributos.receita_tributaria_municipal ?? linha.receita_tributaria_mun)],
     ["Percentual tributário bruto", formatarNumero(linha.pct_tributaria_bruta, 2)],
     ["Percentual da receita tributária", formatarNumero(linha.pct_receita_tributaria, 2)],
-    ["IPTU", formatarMoeda(linha.IPTU)],
-    ["ISS", formatarMoeda(linha.ISS)],
-    ["ITBI", formatarMoeda(linha.ITBI)],
+    ["IPTU", formatarMoeda(tributos.iptu ?? linha.IPTU)],
+    ["ISS", formatarMoeda(tributos.iss ?? linha.ISS)],
+    ["ITBI", formatarMoeda(tributos.itbi ?? linha.ITBI)],
+    ["Fonte dos tributos municipais", tributos.fonte || "Base financeira principal consolidada"],
     ["Bolsa Família", formatarMetrica(linha.bolsa_familia_total, "bolsa_familia_total")],
     ["Faixa populacional", linha.faixa_populacional || "-"],
     ["FPM", formatarMoeda(linha.fpm_valor)],
@@ -1193,6 +1199,7 @@ function renderizarDetalhe(linha, linhasFiltradas) {
 
   renderizarComparacaoDetalhe(linha, linhasFiltradas);
   elementos.interpretacaoDetalhe.textContent = linha.interpretacao || "";
+  carregarTributosMunicipais(linha);
 }
 
 function renderizarComparacaoDetalhe(linha, linhasFiltradas) {
@@ -1234,6 +1241,38 @@ function renderizarComparacaoDetalhe(linha, linhasFiltradas) {
       `
     )
     .join("");
+}
+
+function obterChaveTributos(linha) {
+  return `${linha.codigo_ibge}-${linha.ano}`;
+}
+
+function obterTributosMunicipais(linha) {
+  const chave = obterChaveTributos(linha);
+  return estado.cacheTributosMunicipais[chave] || {};
+}
+
+async function carregarTributosMunicipais(linha) {
+  const chave = obterChaveTributos(linha);
+  if (estado.cacheTributosMunicipais[chave]?.fonte) return;
+  estado.chaveTributosAtiva = chave;
+
+  try {
+    const resposta = await fetch(`/api/tributos?codigo_ibge=${linha.codigo_ibge}&ano=${linha.ano}`);
+    if (!resposta.ok) {
+      throw new Error(`${resposta.status}`);
+    }
+    const payload = await resposta.json();
+    estado.cacheTributosMunicipais[chave] = payload;
+    if (estado.chaveTributosAtiva === chave && estado.codigoSelecionado === linha.codigo_ibge && String(estado.anoAtual) === String(linha.ano)) {
+      renderizarDetalhe(linha, obterLinhasFiltradas());
+    }
+  } catch (erro) {
+    estado.cacheTributosMunicipais[chave] = {
+      fonte: "Base financeira principal consolidada",
+      erro_api_tributos: String(erro.message || erro),
+    };
+  }
 }
 
 function renderizarRanking(linhas) {
