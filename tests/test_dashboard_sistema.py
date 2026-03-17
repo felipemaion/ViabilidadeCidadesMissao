@@ -408,6 +408,10 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("tooltip-clima", self.index_html)
 
     def test_frontend_tem_tabela_do_cenario_unificado(self):
+        self.assertIn("Municípios oficiais no mapa", self.index_html)
+        self.assertIn("Municípios com dados no ano", self.index_html)
+        self.assertIn("Municípios sem dados no ano", self.index_html)
+        self.assertIn("atualizarResumoCoberturaAno", self.app_js)
         self.assertIn("programa-tabela-territorios", self.index_html)
         self.assertIn("programa-tabela-total-brasil", self.index_html)
         self.assertIn("renderizarTabelaMapaUnificado", self.app_js)

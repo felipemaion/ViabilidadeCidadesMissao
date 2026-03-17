@@ -263,9 +263,10 @@ const elementos = {
   coberturaClima: document.getElementById("cobertura-clima"),
   explicacaoClima: document.getElementById("explicacao-clima"),
   insightClima: document.getElementById("insight-clima"),
-  totalLinhas: document.getElementById("total-linhas"),
+  municipiosOficiais: document.getElementById("municipios-oficiais"),
   referenciaBolsa: document.getElementById("referencia-bolsa"),
-  coberturaGeografica: document.getElementById("cobertura-geografica"),
+  municipiosComDados: document.getElementById("municipios-com-dados"),
+  municipiosSemDados: document.getElementById("municipios-sem-dados"),
   tituloMetrica: document.getElementById("titulo-metrica"),
   descricaoMetrica: document.getElementById("descricao-metrica"),
   fonteMetrica: document.getElementById("fonte-metrica"),
@@ -377,12 +378,19 @@ function preencherResumo() {
   elementos.resumoCartilha.textContent = metadata.narrativa.summary;
   elementos.resumoCartilhasBloco.textContent = metadata.narrativa.comparativo.resumo_geral;
   renderizarCartilhas(metadata.narrativa);
-  elementos.totalLinhas.textContent = formatarInteiro(linhas.length);
   elementos.referenciaBolsa.textContent = formatarMes(metadata.ultima_referencia_bolsa_familia);
-  const cobertura = ((metadata.qualidade.municipios_com_geometria / new Set(linhas.map((linha) => linha.codigo_ibge)).size) * 100).toFixed(1);
-  elementos.coberturaGeografica.textContent = `${cobertura}%`;
+  elementos.municipiosOficiais.textContent = formatarInteiro(metadata.qualidade.municipios_com_geometria);
+  atualizarResumoCoberturaAno();
   elementos.escopoClima.textContent = estado.climatologia.escopo;
   renderizarProgramaReforma();
+}
+
+function atualizarResumoCoberturaAno() {
+  const oficiais = estado.metadata.qualidade.municipios_com_geometria;
+  const comDados = new Set(obterLinhasDoAno().map((linha) => linha.codigo_ibge)).size;
+  const semDados = Math.max(0, oficiais - comDados);
+  elementos.municipiosComDados.textContent = formatarInteiro(comDados);
+  elementos.municipiosSemDados.textContent = formatarInteiro(semDados);
 }
 
 function renderizarCartilhas(narrativa) {
@@ -945,6 +953,7 @@ function renderizar() {
   const linhasFiltradas = obterLinhasFiltradas();
   const mapaLinhas = new Map(linhasFiltradas.map((linha) => [linha.codigo_ibge, linha]));
   const caminhosAno = estado.caminhosPorAno[estado.anoAtual] || [];
+  atualizarResumoCoberturaAno();
   atualizarPainelMetrica();
   renderizarMapa(caminhosAno, mapaLinhas);
   renderizarLegenda(linhasFiltradas);
