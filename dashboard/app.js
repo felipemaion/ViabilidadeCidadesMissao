@@ -225,6 +225,9 @@ const elementos = {
   tooltipAjuda: document.getElementById("tooltip-ajuda"),
   tituloDetalhe: document.getElementById("titulo-detalhe"),
   subtituloDetalhe: document.getElementById("subtitulo-detalhe"),
+  buscaMunicipioInput: document.getElementById("busca-municipio-input"),
+  buscaMunicipioSugestoes: document.getElementById("busca-municipio-sugestoes"),
+  ajudaDetalheMontagem: document.getElementById("ajuda-detalhe-montagem"),
   gradeDetalhe: document.getElementById("grade-detalhe"),
   comparacaoDetalhe: document.getElementById("comparacao-detalhe"),
   explicacaoDetalhe: document.getElementById("explicacao-detalhe"),
@@ -315,6 +318,7 @@ const estado = {
   climaVariavelAtual: "precipitacao",
   climaUfAtual: "BRASIL",
   codigoSelecionado: null,
+  buscaMunicipio: "",
   municipiosDestacadosPrograma: [],
   buscaTerritoriosPrograma: "",
   paginaTerritoriosPrograma: 1,
@@ -324,6 +328,7 @@ const estado = {
   cacheTributosMunicipais: {},
   chaveTributosAtiva: null,
   timerBuscaTerritoriosPrograma: null,
+  timerBuscaMunicipio: null,
   mapaTransforms: {
     principal: { escala: 1, x: 0, y: 0 },
     clima: { escala: 1, x: 0, y: 0 },
@@ -377,6 +382,21 @@ function construirIndiceMunicipios(linhas) {
     indice.set(linha.codigo_ibge, `${linha.nome_municipio} (${linha.uf})`);
   });
   return indice;
+}
+
+function obterRotuloMunicipio(linha) {
+  return linha ? `${linha.nome_municipio} (${linha.uf})` : "";
+}
+
+function criarTextoMontagemDetalhe(linha, metrica, tributos) {
+  const fonteTributos = tributos?.fonte || "base financeira principal consolidada";
+  return [
+    `Este quadro combina a métrica ativa "${metrica.rotulo}" com o conjunto fiscal, social e demográfico do município selecionado.`,
+    `A classificação de viabilidade, autonomia fiscal, dependência, receitas, despesas, transferências e população vêm principalmente da planilha 07.03_indicadores_base_completa_20260217.xlsx, aba indicadores. O painel não recalcula nem reinventa o status de viabilidade; ele lê o campo já consolidado na base principal.`,
+    `Bolsa Família vem do arquivo beneficios_bolsa_familia.csv na referência mais recente disponível; IFDM Geral e componentes vêm do ranking oficial da FIRJAN, ano-base 2023; indicadores sociais complementares, como alfabetização, renda, mortalidade infantil e PIB aproximado, vêm da base municipios_enriquecidos6.csv.`,
+    `Para IPTU, ITBI, ISS e receita tributária municipal, o painel prioriza a consulta oficial à API do Siconfi/Tesouro para ${linha.nome_municipio} em ${linha.ano}. Quando essa consulta não retorna dados, o detalhe usa o valor da base consolidada. Fonte atual dos tributos neste município: ${fonteTributos}.`,
+    `O painel ainda compara o município com o filtro atual para mostrar posição relativa de porte, dependência e desempenho, evitando leitura isolada de um único número.`,
+  ].join(" ");
 }
 
 function prepararTerritoriosPrograma(programaReforma) {
@@ -1043,6 +1063,37 @@ function registrarEventos() {
     estado.paginaTerritoriosPrograma += 1;
     renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
   });
+  elementos.buscaMunicipioInput.addEventListener("input", (evento) => {
+    const termo = evento.target.value || "";
+    estado.buscaMunicipio = termo;
+    if (!termo.trim()) {
+      if (estado.timerBuscaMunicipio) {
+        window.clearTimeout(estado.timerBuscaMunicipio);
+      }
+      ocultarSugestoesMunicipio();
+      resetarMapaPrincipal();
+      return;
+    }
+    if (estado.timerBuscaMunicipio) {
+      window.clearTimeout(estado.timerBuscaMunicipio);
+    }
+    estado.timerBuscaMunicipio = window.setTimeout(() => {
+      renderizarSugestoesMunicipio(termo);
+      const correspondenciaExata = obterLinhasFiltradas().find(
+        (linha) => normalizarTextoLivre(obterRotuloMunicipio(linha)) === normalizarTextoLivre(termo)
+      );
+      if (correspondenciaExata) {
+        selecionarMunicipioPrincipal(correspondenciaExata.codigo_ibge);
+      }
+    }, 90);
+  });
+  elementos.buscaMunicipioInput.addEventListener("focus", (evento) => {
+    renderizarSugestoesMunicipio(evento.target.value || "");
+  });
+  document.addEventListener("click", (evento) => {
+    if (evento.target.closest(".busca-municipio-box")) return;
+    ocultarSugestoesMunicipio();
+  });
   document.addEventListener("mouseover", (evento) => {
     const alvo = evento.target.closest(".ajuda-indicador");
     if (!alvo) return;
@@ -1148,14 +1199,66 @@ function renderizarMapa(caminhos, mapaLinhas) {
       path.addEventListener("mousemove", (evento) => posicionarTooltip(evento));
       path.addEventListener("mouseleave", ocultarTooltip);
       path.addEventListener("click", () => {
-        estado.codigoSelecionado = feature.codigo_ibge;
-        renderizar();
+        selecionarMunicipioPrincipal(feature.codigo_ibge);
       });
     }
     grupo.appendChild(path);
   });
   habilitarNavegacaoMapa(elementos.mapa, "principal", "grupo-mapa-principal");
   aplicarTransformacaoMapa("principal", "grupo-mapa-principal");
+}
+
+function focarMunicipioNoMapa(codigoIbge) {
+  if (!codigoIbge || !elementos.mapa) return;
+  const caminho = elementos.mapa.querySelector(`path[data-code="${codigoIbge}"]`);
+  if (!caminho) return;
+  const grupo = document.getElementById("grupo-mapa-principal");
+  if (!grupo) return;
+  grupo.setAttribute("transform", "translate(0 0) scale(1)");
+  const caixa = caminho.getBBox();
+  if (!caixa || !caixa.width || !caixa.height) return;
+  const larguraMapa = Number(estado.metadata?.mapa?.largura) || elementos.mapa.viewBox.baseVal.width;
+  const alturaMapa = Number(estado.metadata?.mapa?.altura) || elementos.mapa.viewBox.baseVal.height;
+  const padding = 64;
+  const escala = Math.max(1, Math.min(10, (larguraMapa - padding * 2) / caixa.width, (alturaMapa - padding * 2) / caixa.height));
+  const centroX = caixa.x + caixa.width / 2;
+  const centroY = caixa.y + caixa.height / 2;
+  estado.mapaTransforms.principal.escala = escala;
+  estado.mapaTransforms.principal.x = larguraMapa / 2 - centroX * escala;
+  estado.mapaTransforms.principal.y = alturaMapa / 2 - centroY * escala;
+  aplicarTransformacaoMapa("principal", "grupo-mapa-principal");
+  requestAnimationFrame(() => ajustarCentroMunicipioNoMapa(caminho));
+}
+
+function ajustarCentroMunicipioNoMapa(caminho) {
+  if (!caminho || !elementos.mapa) return;
+  const svgRect = elementos.mapa.getBoundingClientRect();
+  const pathRect = caminho.getBoundingClientRect();
+  if (!svgRect.width || !svgRect.height || !pathRect.width || !pathRect.height) return;
+  const deltaX = svgRect.left + svgRect.width / 2 - (pathRect.left + pathRect.width / 2);
+  const deltaY = svgRect.top + svgRect.height / 2 - (pathRect.top + pathRect.height / 2);
+  estado.mapaTransforms.principal.x += deltaX;
+  estado.mapaTransforms.principal.y += deltaY;
+  aplicarTransformacaoMapa("principal", "grupo-mapa-principal");
+}
+
+function selecionarMunicipioPrincipal(codigoIbge, { focarMapa = true } = {}) {
+  const linha = obterLinhasFiltradas().find((item) => item.codigo_ibge === codigoIbge);
+  if (!linha) return;
+  estado.codigoSelecionado = codigoIbge;
+  estado.buscaMunicipio = obterRotuloMunicipio(linha);
+  sincronizarBuscaMunicipio();
+  ocultarSugestoesMunicipio();
+  renderizar();
+  if (focarMapa) {
+    requestAnimationFrame(() => focarMunicipioNoMapa(codigoIbge));
+  }
+}
+
+function resetarMapaPrincipal() {
+  estado.codigoSelecionado = null;
+  estado.mapaTransforms.principal = { escala: 1, x: 0, y: 0 };
+  renderizar();
 }
 
 function habilitarNavegacaoMapa(svg, chaveMapa, idGrupo) {
@@ -1197,6 +1300,44 @@ function aplicarTransformacaoMapa(chaveMapa, idGrupo) {
     "transform",
     `translate(${transform.x} ${transform.y}) scale(${transform.escala})`
   );
+}
+
+function sincronizarBuscaMunicipio() {
+  if (elementos.buscaMunicipioInput) {
+    elementos.buscaMunicipioInput.value = estado.buscaMunicipio || "";
+  }
+}
+
+function obterSugestoesMunicipio(termo) {
+  const normalizado = normalizarTextoLivre(termo);
+  if (!normalizado) return [];
+  return obterLinhasFiltradas()
+    .filter((linha) => normalizarTextoLivre(`${linha.nome_municipio} ${linha.uf}`).includes(normalizado))
+    .sort((a, b) => a.nome_municipio.localeCompare(b.nome_municipio, "pt-BR"))
+    .slice(0, 8);
+}
+
+function ocultarSugestoesMunicipio() {
+  elementos.buscaMunicipioSugestoes.innerHTML = "";
+  elementos.buscaMunicipioSugestoes.classList.add("hidden");
+}
+
+function renderizarSugestoesMunicipio(termo) {
+  const sugestoes = obterSugestoesMunicipio(termo);
+  if (!sugestoes.length) {
+    ocultarSugestoesMunicipio();
+    return;
+  }
+  elementos.buscaMunicipioSugestoes.innerHTML = "";
+  sugestoes.forEach((linha) => {
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "sugestao-municipio-item";
+    botao.textContent = obterRotuloMunicipio(linha);
+    botao.addEventListener("click", () => selecionarMunicipioPrincipal(linha.codigo_ibge));
+    elementos.buscaMunicipioSugestoes.appendChild(botao);
+  });
+  elementos.buscaMunicipioSugestoes.classList.remove("hidden");
 }
 
 function aplicarAcaoControleMapa(chaveMapa, acao) {
@@ -1270,6 +1411,8 @@ function renderizarDetalhe(linha, linhasFiltradas) {
     elementos.gradeDetalhe.innerHTML = "";
     elementos.comparacaoDetalhe.innerHTML = "";
     elementos.explicacaoDetalhe.textContent = "";
+    elementos.ajudaDetalheMontagem.dataset.ajuda = "";
+    elementos.ajudaDetalheMontagem.setAttribute("aria-label", "Explicação metodológica do detalhe");
     elementos.interpretacaoDetalhe.textContent = "";
     return;
   }
@@ -1278,7 +1421,10 @@ function renderizarDetalhe(linha, linhasFiltradas) {
   const tributos = obterTributosMunicipais(linha);
   elementos.tituloDetalhe.textContent = `${linha.nome_municipio} (${linha.uf})`;
   elementos.subtituloDetalhe.textContent = `${linha.regiao || "Região indisponível"} · Ano ${linha.ano}`;
-  elementos.explicacaoDetalhe.textContent = `${metrica.detalhe} Para viabilidade, o critério vem do campo já consolidado na planilha principal; o painel não inventa nem recalcula a regra.`;
+  const textoMontagem = criarTextoMontagemDetalhe(linha, metrica, tributos);
+  elementos.explicacaoDetalhe.textContent = "";
+  elementos.ajudaDetalheMontagem.dataset.ajuda = textoMontagem;
+  elementos.ajudaDetalheMontagem.setAttribute("aria-label", textoMontagem);
   elementos.gradeDetalhe.innerHTML = "";
 
   const itens = [

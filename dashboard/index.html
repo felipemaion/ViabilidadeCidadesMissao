@@ -113,9 +113,24 @@
             <p class="section-kicker">Detalhe do município</p>
             <h2 id="titulo-detalhe">Selecione um município no mapa</h2>
             <p id="subtitulo-detalhe" class="muted">O painel lateral será atualizado quando você clicar em uma cidade.</p>
+            <div class="busca-municipio-box">
+              <label class="busca-municipio-label" for="busca-municipio-input">
+                Município
+                <input
+                  id="busca-municipio-input"
+                  type="search"
+                  placeholder="Digite o nome do município"
+                  autocomplete="off"
+                />
+              </label>
+              <div id="busca-municipio-sugestoes" class="busca-municipio-sugestoes hidden"></div>
+            </div>
             <div class="bloco-explicativo">
-              <h3>Como este detalhe foi montado</h3>
-              <p id="explicacao-detalhe" class="detail-copy"></p>
+              <h3>
+                Como este detalhe foi montado
+                <button id="ajuda-detalhe-montagem" class="ajuda-indicador" type="button" aria-label="Explicação metodológica do detalhe">?</button>
+              </h3>
+              <p id="explicacao-detalhe" class="detail-copy hidden"></p>
             </div>
             <dl class="detail-grid" id="grade-detalhe"></dl>
             <div class="comparacao-box">
