@@ -871,8 +871,9 @@ select {
 
 .chart-card-programa-mapa {
   grid-column: 1 / -1;
-  width: min(1120px, 100%);
-  justify-self: center;
+  width: 100%;
+  max-width: none;
+  justify-self: stretch;
 }
 
 .bar-chart,
