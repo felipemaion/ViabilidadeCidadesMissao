@@ -265,89 +265,93 @@
               <div id="programa-territorios" class="bar-chart"></div>
             </article>
             <article class="chart-card">
-              <h3>Mapa simulado dos municípios unificados</h3>
-              <p id="programa-mapa-resumo" class="muted"></p>
-              <p id="programa-mapa-aviso" class="muted"></p>
-              <div class="map-frame map-frame-programa">
-                <div class="map-controls" aria-label="Controles do mapa simulado">
-                  <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="zoom_in">+</button>
-                  <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="zoom_out">-</button>
-                  <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="up">↑</button>
-                  <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="left">←</button>
-                  <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="right">→</button>
-                  <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="down">↓</button>
-                  <button class="botao-mapa controle-mapa destaque" type="button" data-map-target="programa" data-map-action="reset">Resetar</button>
-                </div>
-                <svg id="mapa-programa-svg" aria-label="Mapa simulado de municípios unificados"></svg>
-                <div id="tooltip-programa" class="tooltip hidden"></div>
-              </div>
-              <div class="tabela-cenario-toolbar">
-                <label class="campo-busca-tabela" for="programa-busca-territorios">
-                  Pesquisar por cidade
-                  <input
-                    id="programa-busca-territorios"
-                    type="search"
-                    placeholder="Ex.: Curitiba, São Paulo, Palmas"
-                    autocomplete="off"
-                  />
-                </label>
-                <div class="paginacao-tabela" aria-label="Paginação da tabela do cenário">
-                  <button id="programa-pagina-anterior" class="botao-mapa" type="button">Anterior</button>
-                  <span id="programa-paginacao-resumo" class="muted">Página 1 de 1</span>
-                  <button id="programa-pagina-proxima" class="botao-mapa" type="button">Próxima</button>
-                </div>
-              </div>
-              <div class="tabela-cenario-wrap">
-                <table class="tabela-cenario" aria-label="Tabela de territórios unificados do cenário programático">
-                  <thead>
-                    <tr>
-                      <th>
-                        <button
-                          id="programa-ordenar-territorio"
-                          class="botao-ordenacao-tabela"
-                          type="button"
-                          data-sort-key="nome"
-                        >
-                          Território novo
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          id="programa-ordenar-uf"
-                          class="botao-ordenacao-tabela"
-                          type="button"
-                          data-sort-key="uf"
-                        >
-                          UF
-                        </button>
-                      </th>
-                      <th>Municípios englobados</th>
-                      <th>
-                        <button
-                          id="programa-ordenar-populacao"
-                          class="botao-ordenacao-tabela"
-                          type="button"
-                          data-sort-key="populacao_total"
-                        >
-                          População agregada
-                        </button>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody id="programa-tabela-territorios"></tbody>
-                  <tfoot>
-                    <tr>
-                      <th colspan="3">Brasil</th>
-                      <th id="programa-tabela-total-brasil">-</th>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </article>
-            <article class="chart-card">
               <h3>Municípios prioritários no cenário inicial</h3>
               <p id="programa-cenarios-aviso" class="muted"></p>
               <div id="programa-cenarios" class="bar-chart"></div>
+            </article>
+            <article class="chart-card chart-card-programa-mapa">
+              <h3>Mapa simulado dos municípios unificados</h3>
+              <p id="programa-mapa-resumo" class="muted"></p>
+              <p id="programa-mapa-aviso" class="muted"></p>
+              <div class="programa-mapa-grid">
+                <div class="map-frame map-frame-programa">
+                  <div class="map-controls" aria-label="Controles do mapa simulado">
+                    <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="zoom_in">+</button>
+                    <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="zoom_out">-</button>
+                    <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="up">↑</button>
+                    <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="left">←</button>
+                    <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="right">→</button>
+                    <button class="botao-mapa controle-mapa" type="button" data-map-target="programa" data-map-action="down">↓</button>
+                    <button class="botao-mapa controle-mapa destaque" type="button" data-map-target="programa" data-map-action="reset">Resetar</button>
+                  </div>
+                  <svg id="mapa-programa-svg" aria-label="Mapa simulado de municípios unificados"></svg>
+                  <div id="tooltip-programa" class="tooltip hidden"></div>
+                </div>
+                <div class="programa-tabela-coluna">
+                  <div class="tabela-cenario-toolbar">
+                    <label class="campo-busca-tabela" for="programa-busca-territorios">
+                      <span>Cidade:</span>
+                      <input
+                        id="programa-busca-territorios"
+                        type="search"
+                        placeholder="Ex.: Curitiba, São Paulo, Palmas"
+                        autocomplete="off"
+                      />
+                    </label>
+                    <div class="paginacao-tabela" aria-label="Paginação da tabela do cenário">
+                      <button id="programa-pagina-anterior" class="botao-mapa" type="button" aria-label="Página anterior">&lt;</button>
+                      <span id="programa-paginacao-resumo" class="muted">Página 1 de 1</span>
+                      <button id="programa-pagina-proxima" class="botao-mapa" type="button" aria-label="Próxima página">&gt;</button>
+                    </div>
+                  </div>
+                  <div class="tabela-cenario-wrap">
+                    <table class="tabela-cenario" aria-label="Tabela de territórios unificados do cenário programático">
+                      <thead>
+                        <tr>
+                          <th>
+                            <button
+                              id="programa-ordenar-territorio"
+                              class="botao-ordenacao-tabela"
+                              type="button"
+                              data-sort-key="nome"
+                            >
+                              Território novo
+                            </button>
+                          </th>
+                          <th>
+                            <button
+                              id="programa-ordenar-uf"
+                              class="botao-ordenacao-tabela"
+                              type="button"
+                              data-sort-key="uf"
+                            >
+                              UF
+                            </button>
+                          </th>
+                          <th class="coluna-municipios">Municípios englobados</th>
+                          <th>
+                            <button
+                              id="programa-ordenar-populacao"
+                              class="botao-ordenacao-tabela"
+                              type="button"
+                              data-sort-key="populacao_total"
+                            >
+                              População agregada
+                            </button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody id="programa-tabela-territorios"></tbody>
+                      <tfoot>
+                        <tr>
+                          <th colspan="3">Brasil</th>
+                          <th id="programa-tabela-total-brasil">-</th>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </article>
             <article class="chart-card">
               <h3>Arquitetura legal e transição</h3>

@@ -302,6 +302,7 @@ const elementos = {
 const estado = {
   metadata: null,
   linhas: [],
+  nomeMunicipioPorCodigo: new Map(),
   caminhosPorAno: {},
   climatologia: null,
   programaReforma: null,
@@ -319,8 +320,10 @@ const estado = {
   paginaTerritoriosPrograma: 1,
   itensPorPaginaTerritoriosPrograma: 15,
   ordenacaoTerritoriosPrograma: { chave: "nome", direcao: "asc" },
+  territorioProgramaSelecionadoId: null,
   cacheTributosMunicipais: {},
   chaveTributosAtiva: null,
+  timerBuscaTerritoriosPrograma: null,
   mapaTransforms: {
     principal: { escala: 1, x: 0, y: 0 },
     clima: { escala: 1, x: 0, y: 0 },
@@ -344,8 +347,10 @@ async function inicializar() {
 
   estado.metadata = metadata;
   estado.linhas = linhas;
+  estado.nomeMunicipioPorCodigo = construirIndiceMunicipios(linhas);
   estado.caminhosPorAno = caminhos;
   estado.climatologia = climatologia;
+  prepararTerritoriosPrograma(programaReforma);
   estado.programaReforma = programaReforma;
   estado.anoAtual = String(metadata.filtros.anos.at(-1));
 
@@ -363,6 +368,27 @@ async function buscarJson(url) {
     throw new Error(`${resposta.status} ao buscar ${url}`);
   }
   return resposta.json();
+}
+
+function construirIndiceMunicipios(linhas) {
+  const indice = new Map();
+  (linhas || []).forEach((linha) => {
+    if (!linha?.codigo_ibge || !linha?.nome_municipio || !linha?.uf) return;
+    indice.set(linha.codigo_ibge, `${linha.nome_municipio} (${linha.uf})`);
+  });
+  return indice;
+}
+
+function prepararTerritoriosPrograma(programaReforma) {
+  const territorios = programaReforma?.mapa_unificado?.territorios || [];
+  territorios.forEach((territorio) => {
+    const municipiosTexto = (territorio.municipios || [])
+      .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
+      .filter(Boolean)
+      .join(", ");
+    territorio._municipiosTexto = municipiosTexto;
+    territorio._termoBusca = normalizarTextoLivre([territorio.nome, territorio.uf, municipiosTexto].join(" "));
+  });
 }
 
 function prepararMapa() {
@@ -491,10 +517,6 @@ function renderizarTerritoriosPrograma(territorios) {
   territorios
     .slice(0, 12)
     .forEach((territorio) => {
-      const nomesMunicipios = territorio.municipios
-        .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
-        .filter(Boolean)
-        .join(", ");
       const card = document.createElement("div");
       card.className = "programa-card";
       card.innerHTML = `
@@ -504,7 +526,7 @@ function renderizarTerritoriosPrograma(territorios) {
           territorio.dependencia_media,
           1
         )}% · IFDM médio: ${formatarNumero(territorio.ifdm_medio, 3)} · Status predominante: ${territorio.status_predominante}</small>
-        <small>Municípios: ${nomesMunicipios || "Sem detalhamento nominal disponível."}</small>
+        <small>Municípios: ${territorio._municipiosTexto || "Sem detalhamento nominal disponível."}</small>
       `;
       elementos.programaTerritorios.appendChild(card);
     });
@@ -529,8 +551,12 @@ function renderizarCenariosPrograma(municipios) {
 
 function renderizarTabelaMapaUnificado(territorios) {
   elementos.programaTabelaTerritorios.innerHTML = "";
-  const territoriosFiltrados = ordenarTerritoriosMapaUnificado(filtrarTerritoriosMapaUnificado(territorios || []));
+  const territoriosFiltradosBase = ordenarTerritoriosMapaUnificado(filtrarTerritoriosMapaUnificado(territorios || []));
+  const territoriosFiltrados = estado.territorioProgramaSelecionadoId
+    ? territoriosFiltradosBase.filter((territorio) => territorio.id === estado.territorioProgramaSelecionadoId)
+    : territoriosFiltradosBase;
   const totalBrasil = (territorios || []).reduce((acumulado, territorio) => acumulado + (territorio.populacao_total || 0), 0);
+  sincronizarPaginaTerritorioSelecionado(territoriosFiltrados);
   const totalPaginas = Math.max(1, Math.ceil(territoriosFiltrados.length / estado.itensPorPaginaTerritoriosPrograma));
   estado.paginaTerritoriosPrograma = Math.min(Math.max(1, estado.paginaTerritoriosPrograma), totalPaginas);
   const inicio = (estado.paginaTerritoriosPrograma - 1) * estado.itensPorPaginaTerritoriosPrograma;
@@ -538,17 +564,16 @@ function renderizarTabelaMapaUnificado(territorios) {
 
   territoriosDaPagina.forEach((territorio) => {
     const linha = document.createElement("tr");
-    const municipios = (territorio.municipios || [])
-      .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
-      .filter(Boolean)
-      .join(", ");
+    linha.className = territorio.id === estado.territorioProgramaSelecionadoId ? "linha-selecionada" : "";
+    linha.dataset.territorioId = territorio.id;
 
     linha.innerHTML = `
       <td>${territorio.nome}</td>
       <td>${territorio.uf}</td>
-      <td>${municipios || "Sem detalhamento nominal disponível."}</td>
+      <td>${territorio._municipiosTexto || "Sem detalhamento nominal disponível."}</td>
       <td>${formatarInteiro(territorio.populacao_total)}</td>
     `;
+    linha.addEventListener("click", () => selecionarTerritorioPrograma(territorio.id));
     elementos.programaTabelaTerritorios.appendChild(linha);
   });
 
@@ -559,9 +584,9 @@ function renderizarTabelaMapaUnificado(territorios) {
   }
 
   elementos.programaTabelaTotalBrasil.textContent = formatarInteiro(totalBrasil);
-  elementos.programaPaginacaoResumo.textContent = `Página ${formatarInteiro(estado.paginaTerritoriosPrograma)} de ${formatarInteiro(
+  elementos.programaPaginacaoResumo.textContent = `${formatarInteiro(estado.paginaTerritoriosPrograma)} de ${formatarInteiro(
     totalPaginas
-  )} · ${formatarInteiro(territoriosFiltrados.length)} territórios encontrados`;
+  )} · ${formatarInteiro(territoriosFiltrados.length)} territórios`;
   elementos.programaPaginaAnterior.disabled = estado.paginaTerritoriosPrograma <= 1;
   elementos.programaPaginaProxima.disabled = estado.paginaTerritoriosPrograma >= totalPaginas;
   sincronizarCabecalhosTabelaPrograma();
@@ -571,15 +596,17 @@ function sincronizarControlesTabelaPrograma() {
   elementos.programaBuscaTerritorios.value = estado.buscaTerritoriosPrograma;
 }
 
+function sincronizarPaginaTerritorioSelecionado(territoriosFiltrados) {
+  if (!estado.territorioProgramaSelecionadoId) return;
+  const indice = territoriosFiltrados.findIndex((territorio) => territorio.id === estado.territorioProgramaSelecionadoId);
+  if (indice === -1) return;
+  estado.paginaTerritoriosPrograma = Math.floor(indice / estado.itensPorPaginaTerritoriosPrograma) + 1;
+}
+
 function filtrarTerritoriosMapaUnificado(territorios) {
   const termo = normalizarTextoLivre(estado.buscaTerritoriosPrograma);
   if (!termo) return territorios;
-  return territorios.filter((territorio) => {
-    const municipios = (territorio.municipios || [])
-      .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
-      .join(" ");
-    return [territorio.nome, territorio.uf, municipios].some((valor) => normalizarTextoLivre(valor).includes(termo));
-  });
+  return territorios.filter((territorio) => (territorio._termoBusca || "").includes(termo));
 }
 
 function ordenarTerritoriosMapaUnificado(territorios) {
@@ -605,6 +632,56 @@ function sincronizarCabecalhosTabelaPrograma() {
     elemento.textContent = `${rotulo} ${seta}`;
     elemento.setAttribute("aria-pressed", String(ativo));
   });
+}
+
+function selecionarTerritorioPrograma(territorioId) {
+  const territorios = estado.programaReforma?.mapa_unificado?.territorios || [];
+  const territorioSelecionado = territorios.find((territorio) => territorio.id === territorioId) || null;
+  estado.territorioProgramaSelecionadoId = territorioId;
+  if (territorioSelecionado) {
+    estado.buscaTerritoriosPrograma = territorioSelecionado.nome;
+    sincronizarControlesTabelaPrograma();
+  }
+  renderizarMapaUnificadoPrograma(territorios);
+  renderizarTabelaMapaUnificado(territorios);
+  requestAnimationFrame(() => {
+    focarTerritorioProgramaNoMapa(territorioId);
+    const linha = elementos.programaTabelaTerritorios.querySelector(`tr[data-territorio-id="${territorioId}"]`);
+    linha?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+}
+
+function resetarInteracaoPrograma({ manterBusca = false } = {}) {
+  if (!manterBusca) {
+    estado.buscaTerritoriosPrograma = "";
+  }
+  estado.paginaTerritoriosPrograma = 1;
+  estado.ordenacaoTerritoriosPrograma = { chave: "nome", direcao: "asc" };
+  estado.territorioProgramaSelecionadoId = null;
+  estado.mapaTransforms.programa = { escala: 1, x: 0, y: 0 };
+  limparDestaqueMunicipiosPrograma();
+  limparDestaqueProgramaNoMapaSimulado();
+  sincronizarControlesTabelaPrograma();
+}
+
+function atualizarInteracaoProgramaSemRecriarMapa() {
+  const grupo = document.getElementById("grupo-mapa-programa-root");
+  if (grupo) {
+    const caminhos = grupo.querySelectorAll("path[data-territorio-id]");
+    caminhos.forEach((caminho) => {
+      const selecionado = caminho.dataset.territorioId === estado.territorioProgramaSelecionadoId;
+      caminho.setAttribute("class", `municipality${selecionado ? " highlighted" : ""}`);
+      caminho.setAttribute("stroke-width", selecionado ? "1.35" : "0.42");
+    });
+  }
+  aplicarTransformacaoMapa("programa", "grupo-mapa-programa-root");
+}
+
+function aplicarBuscaTerritoriosPrograma(termo) {
+  estado.buscaTerritoriosPrograma = termo || "";
+  resetarInteracaoPrograma({ manterBusca: true });
+  atualizarInteracaoProgramaSemRecriarMapa();
+  renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
 }
 
 function renderizarArquiteturaLegal(eixos) {
@@ -643,8 +720,7 @@ function renderizarCapitaisIfdm(capitais) {
 }
 
 function obterNomeMunicipioPorCodigo(codigoIbge) {
-  const linha = estado.linhas.find((item) => String(item.ano) === estado.anoAtual && item.codigo_ibge === codigoIbge);
-  return linha ? `${linha.nome_municipio} (${linha.uf})` : codigoIbge;
+  return estado.nomeMunicipioPorCodigo.get(codigoIbge) || codigoIbge;
 }
 
 function renderizarMapaUnificadoPrograma(territorios) {
@@ -670,10 +746,11 @@ function renderizarMapaUnificadoPrograma(territorios) {
     const path = document.createElementNS(namespace, "path");
     const cor = valorSignificativo(territorio.dependencia_media) ? escala.pick(Number(territorio.dependencia_media)) : "#d6dad6";
     path.setAttribute("d", territorio.caminho_svg);
+    path.dataset.territorioId = territorio.id;
     path.setAttribute("fill", cor);
     path.setAttribute("stroke", "rgba(255,255,255,0.45)");
-    path.setAttribute("stroke-width", "0.42");
-    path.setAttribute("class", "municipality");
+    path.setAttribute("stroke-width", territorio.id === estado.territorioProgramaSelecionadoId ? "1.35" : "0.42");
+    path.setAttribute("class", `municipality${territorio.id === estado.territorioProgramaSelecionadoId ? " highlighted" : ""}`);
     path.addEventListener("mouseenter", (evento) => {
       destacarMunicipiosDoTerritorio(territorio.municipios || []);
       renderizarDestaqueProgramaNoMapaSimulado(territorio.municipios || []);
@@ -681,21 +758,23 @@ function renderizarMapaUnificadoPrograma(territorios) {
     });
     path.addEventListener("mousemove", posicionarTooltipPrograma);
     path.addEventListener("mouseleave", () => {
-      limparDestaqueMunicipiosPrograma();
-      limparDestaqueProgramaNoMapaSimulado();
+      if (!estado.territorioProgramaSelecionadoId) {
+        limparDestaqueMunicipiosPrograma();
+        limparDestaqueProgramaNoMapaSimulado();
+      } else {
+        reaplicarSelecaoTerritorioPrograma();
+      }
       ocultarTooltipPrograma();
     });
+    path.addEventListener("click", () => selecionarTerritorioPrograma(territorio.id));
     grupo.appendChild(path);
   });
+  reaplicarSelecaoTerritorioPrograma();
   habilitarNavegacaoMapa(elementos.mapaPrograma, "programa", "grupo-mapa-programa-root");
   aplicarTransformacaoMapa("programa", "grupo-mapa-programa-root");
 }
 
 function exibirTooltipPrograma(evento, territorio) {
-  const municipios = (territorio.municipios || [])
-    .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
-    .filter(Boolean)
-    .join(", ");
   elementos.tooltipPrograma.classList.remove("hidden");
   elementos.tooltipPrograma.innerHTML = `
     <div class="tooltip-programa-card">
@@ -712,11 +791,52 @@ function exibirTooltipPrograma(evento, territorio) {
       </div>
       <div class="tooltip-programa-lista">
         <span>Municípios englobados</span>
-        <small>${municipios || "Sem detalhamento nominal disponível."}</small>
+        <small>${territorio._municipiosTexto || "Sem detalhamento nominal disponível."}</small>
       </div>
     </div>
   `;
   posicionarTooltipPrograma(evento);
+}
+
+function focarTerritorioProgramaNoMapa(territorioId) {
+  if (!territorioId || !elementos.mapaPrograma) return;
+  const caminho = elementos.mapaPrograma.querySelector(`path[data-territorio-id="${territorioId}"]`);
+  if (!caminho) return;
+  const grupo = document.getElementById("grupo-mapa-programa-root");
+  if (!grupo) return;
+  grupo.setAttribute("transform", "translate(0 0) scale(1)");
+  const caixa = caminho.getBBox();
+  if (!caixa || !caixa.width || !caixa.height) return;
+  const larguraMapa = Number(estado.metadata?.mapa?.largura) || elementos.mapaPrograma.viewBox.baseVal.width;
+  const alturaMapa = Number(estado.metadata?.mapa?.altura) || elementos.mapaPrograma.viewBox.baseVal.height;
+  const padding = 42;
+  const escala = Math.max(
+    1,
+    Math.min(
+      8,
+      (larguraMapa - padding * 2) / caixa.width,
+      (alturaMapa - padding * 2) / caixa.height
+    )
+  );
+  const centroX = caixa.x + caixa.width / 2;
+  const centroY = caixa.y + caixa.height / 2;
+  estado.mapaTransforms.programa.escala = escala;
+  estado.mapaTransforms.programa.x = larguraMapa / 2 - centroX * escala;
+  estado.mapaTransforms.programa.y = alturaMapa / 2 - centroY * escala;
+  aplicarTransformacaoMapa("programa", "grupo-mapa-programa-root");
+  requestAnimationFrame(() => ajustarCentroTerritorioPrograma(caminho));
+}
+
+function ajustarCentroTerritorioPrograma(caminho) {
+  if (!caminho || !elementos.mapaPrograma) return;
+  const svgRect = elementos.mapaPrograma.getBoundingClientRect();
+  const pathRect = caminho.getBoundingClientRect();
+  if (!svgRect.width || !svgRect.height || !pathRect.width || !pathRect.height) return;
+  const deltaX = svgRect.left + svgRect.width / 2 - (pathRect.left + pathRect.width / 2);
+  const deltaY = svgRect.top + svgRect.height / 2 - (pathRect.top + pathRect.height / 2);
+  estado.mapaTransforms.programa.x += deltaX;
+  estado.mapaTransforms.programa.y += deltaY;
+  aplicarTransformacaoMapa("programa", "grupo-mapa-programa-root");
 }
 
 function posicionarTooltipPrograma(evento) {
@@ -747,6 +867,19 @@ function destacarMunicipiosDoTerritorio(codigos) {
 function limparDestaqueMunicipiosPrograma() {
   estado.municipiosDestacadosPrograma = [];
   atualizarDestaqueMunicipiosPrograma();
+}
+
+function reaplicarSelecaoTerritorioPrograma() {
+  const territorios = estado.programaReforma?.mapa_unificado?.territorios || [];
+  const territorio = territorios.find((item) => item.id === estado.territorioProgramaSelecionadoId);
+  if (!territorio) {
+    limparDestaqueMunicipiosPrograma();
+    limparDestaqueProgramaNoMapaSimulado();
+    return;
+  }
+  estado.municipiosDestacadosPrograma = [...(territorio.municipios || [])];
+  atualizarDestaqueMunicipiosPrograma();
+  renderizarDestaqueProgramaNoMapaSimulado(territorio.municipios || []);
 }
 
 function atualizarDestaqueMunicipiosPrograma() {
@@ -881,9 +1014,13 @@ function registrarEventos() {
     renderizarClima();
   });
   elementos.programaBuscaTerritorios.addEventListener("input", (evento) => {
-    estado.buscaTerritoriosPrograma = evento.target.value || "";
-    estado.paginaTerritoriosPrograma = 1;
-    renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+    const termo = evento.target.value || "";
+    if (estado.timerBuscaTerritoriosPrograma) {
+      window.clearTimeout(estado.timerBuscaTerritoriosPrograma);
+    }
+    estado.timerBuscaTerritoriosPrograma = window.setTimeout(() => {
+      aplicarBuscaTerritoriosPrograma(termo);
+    }, 120);
   });
   [elementos.programaOrdenarTerritorio, elementos.programaOrdenarUf, elementos.programaOrdenarPopulacao].forEach((botao) => {
     botao.addEventListener("click", () => {
@@ -1066,7 +1203,7 @@ function aplicarAcaoControleMapa(chaveMapa, acao) {
   const ids = {
     principal: "grupo-mapa-principal",
     clima: "grupo-mapa-clima",
-    programa: "grupo-mapa-programa",
+    programa: "grupo-mapa-programa-root",
   };
   const transform = estado.mapaTransforms[chaveMapa];
   if (!transform) return;
@@ -1078,6 +1215,13 @@ function aplicarAcaoControleMapa(chaveMapa, acao) {
   if (acao === "left") transform.x += passo;
   if (acao === "right") transform.x -= passo;
   if (acao === "reset") {
+    if (chaveMapa === "programa") {
+      resetarInteracaoPrograma();
+      const territorios = estado.programaReforma?.mapa_unificado?.territorios || [];
+      renderizarMapaUnificadoPrograma(territorios);
+      renderizarTabelaMapaUnificado(territorios);
+      return;
+    }
     transform.escala = 1;
     transform.x = 0;
     transform.y = 0;
