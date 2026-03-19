@@ -1651,7 +1651,11 @@ function renderizarStatus(linhas) {
 function renderizarRegioes(linhas) {
   elementos.graficoRegioes.innerHTML = "";
   const metrica = definicoesMetricas[estado.metricaAtual];
-  const grupos = agruparPor(linhas.filter((linha) => valorSignificativo(linha[estado.metricaAtual])), "regiao");
+  const linhasValidas =
+    metrica.tipo === "categorica"
+      ? linhas.filter((linha) => linha[estado.metricaAtual] && linha[estado.metricaAtual] !== "Sem dado")
+      : linhas.filter((linha) => valorSignificativo(linha[estado.metricaAtual]));
+  const grupos = agruparPor(linhasValidas, "regiao");
   const medias = Object.entries(grupos)
     .map(([regiao, itens]) => ({
       rotulo: regiao,

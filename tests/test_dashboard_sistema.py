@@ -451,6 +451,8 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("renderizarSugestoesMunicipio", self.app_js)
         self.assertIn("buscaMunicipio", self.app_js)
         self.assertIn("prepararTerritoriosPrograma", self.app_js)
+        self.assertIn('metrica.tipo === "categorica"', self.app_js)
+        self.assertIn('linha[estado.metricaAtual] !== "Sem dado"', self.app_js)
         self.assertIn("timerBuscaTerritoriosPrograma", self.app_js)
         self.assertIn("window.setTimeout", self.app_js)
         self.assertIn("aplicarBuscaTerritoriosPrograma", self.app_js)
