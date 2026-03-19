@@ -41,32 +41,6 @@
               <p class="section-kicker">Explorador cartográfico</p>
               <h2>Mapa coroplético municipal do Brasil</h2>
             </div>
-            <div class="filters">
-              <label>
-                Métrica
-                <select id="seletor-metrica"></select>
-              </label>
-              <label>
-                Ano
-                <select id="seletor-ano"></select>
-              </label>
-              <label>
-                UF
-                <select id="seletor-uf"></select>
-              </label>
-              <label>
-                Região
-                <select id="seletor-regiao"></select>
-              </label>
-              <label>
-                Faixa populacional
-                <select id="seletor-faixa-populacional"></select>
-              </label>
-              <label>
-                Status de viabilidade
-                <select id="seletor-status"></select>
-              </label>
-            </div>
           </div>
           <div class="metrica-resumo">
             <div class="metrica-card destaque">
@@ -87,59 +61,85 @@
               <div id="interpretacao-metrica" class="detail-copy"></div>
             </div>
           </div>
-          <div class="map-shell">
-            <div class="map-frame">
-              <div class="map-controls" aria-label="Controles do mapa principal">
-                <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="zoom_in">+</button>
-                <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="zoom_out">-</button>
-                <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="up">↑</button>
-                <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="left">←</button>
-                <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="right">→</button>
-                <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="down">↓</button>
-                <button id="resetar-mapa" class="botao-mapa controle-mapa destaque" type="button" data-map-target="principal" data-map-action="reset">Resetar</button>
+          <div class="filters filters-mapa">
+            <label>
+              Métrica
+              <select id="seletor-metrica"></select>
+            </label>
+            <label>
+              Ano
+              <select id="seletor-ano"></select>
+            </label>
+            <label>
+              UF
+              <select id="seletor-uf"></select>
+            </label>
+            <label>
+              Região
+              <select id="seletor-regiao"></select>
+            </label>
+            <label>
+              Faixa populacional
+              <select id="seletor-faixa-populacional"></select>
+            </label>
+            <label>
+              Status de viabilidade
+              <select id="seletor-status"></select>
+            </label>
+          </div>
+          <div class="explorer-layout">
+            <div class="map-shell">
+              <div class="map-frame">
+                <div class="map-controls" aria-label="Controles do mapa principal">
+                  <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="zoom_in">+</button>
+                  <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="zoom_out">-</button>
+                  <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="up">↑</button>
+                  <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="left">←</button>
+                  <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="right">→</button>
+                  <button class="botao-mapa controle-mapa" type="button" data-map-target="principal" data-map-action="down">↓</button>
+                  <button id="resetar-mapa" class="botao-mapa controle-mapa destaque" type="button" data-map-target="principal" data-map-action="reset">Resetar</button>
+                </div>
+                <div class="legenda-mapa legenda-mapa-sobreposta">
+                  <div class="titulo-legenda" id="titulo-legenda">Legenda</div>
+                  <div class="escala-legenda" id="escala-legenda"></div>
+                </div>
+                <svg id="mapa-svg" aria-label="Mapa municipal do Brasil"></svg>
+                <div id="tooltip-mapa" class="tooltip hidden"></div>
               </div>
-              <svg id="mapa-svg" aria-label="Mapa municipal do Brasil"></svg>
-              <div id="tooltip-mapa" class="tooltip hidden"></div>
             </div>
-            <div class="legenda-mapa">
-              <div class="titulo-legenda" id="titulo-legenda">Legenda</div>
-              <div class="escala-legenda" id="escala-legenda"></div>
+            <div class="panel panel-sidebar panel-sidebar-embed">
+              <div class="sidebar-block">
+                <p class="section-kicker section-kicker-inline">
+                  <span>Detalhe do município</span>
+                  <button id="ajuda-detalhe-montagem" class="ajuda-indicador" type="button" aria-label="Explicação metodológica do detalhe">?</button>
+                </p>
+                <div class="detalhe-titulo-linha">
+                  <h2 id="titulo-detalhe">Selecione um município no mapa</h2>
+                  <p id="subtitulo-detalhe" class="muted">O painel lateral será atualizado quando você clicar em uma cidade.</p>
+                </div>
+                <div class="busca-municipio-box">
+                  <label class="busca-municipio-label" for="busca-municipio-input">
+                    <span>Município</span>
+                    <input
+                      id="busca-municipio-input"
+                      type="search"
+                      placeholder="Digite o nome do município"
+                      autocomplete="off"
+                    />
+                  </label>
+                  <div id="busca-municipio-sugestoes" class="busca-municipio-sugestoes hidden"></div>
+                </div>
+                <p id="explicacao-detalhe" class="detail-copy hidden" aria-hidden="true"></p>
+                <dl class="detail-grid" id="grade-detalhe"></dl>
+                <div class="comparacao-box">
+                  <h3>Comparação com o filtro atual</h3>
+                  <div id="comparacao-detalhe" class="comparacao-grid"></div>
+                </div>
+                <p class="detail-copy" id="interpretacao-detalhe"></p>
+              </div>
             </div>
           </div>
         </section>
-
-        <aside class="panel panel-sidebar">
-          <div class="sidebar-block">
-            <p class="section-kicker">Detalhe do município</p>
-            <h2 id="titulo-detalhe">Selecione um município no mapa</h2>
-            <p id="subtitulo-detalhe" class="muted">O painel lateral será atualizado quando você clicar em uma cidade.</p>
-            <div class="busca-municipio-box">
-              <label class="busca-municipio-label" for="busca-municipio-input">
-                Município
-                <input
-                  id="busca-municipio-input"
-                  type="search"
-                  placeholder="Digite o nome do município"
-                  autocomplete="off"
-                />
-              </label>
-              <div id="busca-municipio-sugestoes" class="busca-municipio-sugestoes hidden"></div>
-            </div>
-            <div class="bloco-explicativo">
-              <h3>
-                Como este detalhe foi montado
-                <button id="ajuda-detalhe-montagem" class="ajuda-indicador" type="button" aria-label="Explicação metodológica do detalhe">?</button>
-              </h3>
-              <p id="explicacao-detalhe" class="detail-copy hidden"></p>
-            </div>
-            <dl class="detail-grid" id="grade-detalhe"></dl>
-            <div class="comparacao-box">
-              <h3>Comparação com o filtro atual</h3>
-              <div id="comparacao-detalhe" class="comparacao-grid"></div>
-            </div>
-            <p class="detail-copy" id="interpretacao-detalhe"></p>
-          </div>
-        </aside>
 
         <section class="panel panel-charts">
           <div class="panel-header compact">
