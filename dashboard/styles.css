@@ -12,6 +12,10 @@
   --shadow: 0 22px 60px rgba(36, 41, 32, 0.1);
   --font-display: "Avenir Next", "Segoe UI", sans-serif;
   --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --radius-panel: 28px;
+  --radius-card: 20px;
+  --text-sm: 0.84rem;
+  --text-xs: 0.74rem;
 }
 
 * {
@@ -21,6 +25,7 @@
 body {
   margin: 0;
   font-family: var(--font-body);
+  font-size: 16px;
   color: var(--ink);
   background:
     radial-gradient(circle at top left, rgba(29, 107, 82, 0.18), transparent 28%),
@@ -46,7 +51,7 @@ body {
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 28px;
+  border-radius: var(--radius-panel);
   box-shadow: var(--shadow);
 }
 
@@ -58,7 +63,7 @@ body {
 .section-kicker {
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   color: var(--accent);
   font-weight: 700;
 }
@@ -110,7 +115,7 @@ h1 {
 
 .stat-label {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 
 .layout {
@@ -127,6 +132,7 @@ h1 {
 
 .panel {
   padding: 22px;
+  min-width: 0;
 }
 
 .panel-map {
@@ -201,11 +207,13 @@ label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
-select {
+select,
+input[type="search"],
+input[type="text"] {
   appearance: none;
   width: 100%;
   border-radius: 14px;
@@ -271,6 +279,10 @@ select {
   border: 1px solid var(--line);
   border-radius: 20px;
   overflow: auto;
+  width: 100%;
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   background: rgba(255, 255, 255, 0.78);
   max-height: 620px;
 }
@@ -347,11 +359,11 @@ select {
 }
 
 .tabela-cenario {
-  width: 100%;
-  min-width: 0;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
-  font-size: 0.84rem;
+  table-layout: auto;
+  font-size: var(--text-sm);
 }
 
 .tabela-cenario th,
@@ -372,31 +384,12 @@ select {
   position: sticky;
   top: 0;
   z-index: 1;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   line-height: 1.05;
   letter-spacing: 0.015em;
   text-transform: uppercase;
   color: var(--accent);
-}
-
-.tabela-cenario thead th:nth-child(1),
-.tabela-cenario td:nth-child(1) {
-  width: 26%;
-}
-
-.tabela-cenario thead th:nth-child(2),
-.tabela-cenario td:nth-child(2) {
-  width: 8%;
-}
-
-.tabela-cenario thead th:nth-child(3),
-.tabela-cenario td:nth-child(3) {
-  width: 46%;
-}
-
-.tabela-cenario thead th:nth-child(4),
-.tabela-cenario td:nth-child(4) {
-  width: 20%;
+  white-space: nowrap;
 }
 
 .botao-ordenacao-tabela {
@@ -441,7 +434,7 @@ select {
 }
 
 .tabela-cenario td:nth-child(3) {
-  font-size: 0.79rem;
+  font-size: 0.8rem;
   line-height: 1.14;
   color: var(--muted);
 }
@@ -468,7 +461,7 @@ select {
 
 .metrica-card {
   padding: 16px;
-  border-radius: 20px;
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.68);
   border: 1px solid var(--line);
   min-width: 0;
@@ -480,7 +473,8 @@ select {
 
 .metrica-card h3 {
   margin: 8px 0 10px;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
+  line-height: 1.18;
 }
 
 .clima-filtros {
@@ -643,7 +637,7 @@ select {
   position: fixed;
   z-index: 20;
   min-width: 220px;
-  max-width: 380px;
+  max-width: min(380px, calc(100vw - 20px));
   pointer-events: none;
 }
 
@@ -869,15 +863,15 @@ select {
 
 .detail-grid dt {
   color: var(--muted);
-  font-size: 0.7rem;
-  line-height: 1.12;
+  font-size: 0.72rem;
+  line-height: 1.2;
 }
 
 .detail-grid dd {
   margin: 4px 0 0;
   font-weight: 700;
-  font-size: 0.92rem;
-  line-height: 1.12;
+  font-size: 0.98rem;
+  line-height: 1.18;
 }
 
 .comparacao-grid {
@@ -900,7 +894,7 @@ select {
 
 .comparacao-item span {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   margin-bottom: 4px;
 }
 
@@ -994,6 +988,7 @@ select {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.62);
   padding: 18px;
+  min-width: 0;
 }
 
 .chart-card-programa-mapa {
@@ -1230,13 +1225,13 @@ select {
   width: max-content;
   min-width: 100%;
   border-collapse: collapse;
-  min-width: 1120px;
-  font-size: 0.84rem;
+  min-width: 1040px;
+  font-size: var(--text-sm);
 }
 
 .programa-tabela-municipios th,
 .programa-tabela-municipios td {
-  padding: 10px 12px;
+  padding: 9px 10px;
   border-bottom: 1px solid rgba(24, 36, 31, 0.08);
   text-align: left;
   vertical-align: top;
@@ -1302,11 +1297,14 @@ select {
   }
 
   .hero-stats,
-  .metrica-resumo,
   .charts-grid,
   .programa-agrupamentos-grid,
   .cartilhas-grid {
     grid-template-columns: 1fr;
+  }
+
+  .metrica-resumo {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .hero-stats {
@@ -1328,6 +1326,11 @@ select {
   .detail-grid,
   .comparacao-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bar-row,
+  .stack-row {
+    grid-template-columns: 140px minmax(0, 1fr) 68px;
   }
 }
 
@@ -1380,6 +1383,24 @@ select {
     min-width: 960px;
     font-size: 0.8rem;
   }
+
+  .tabela-cenario {
+    min-width: 780px;
+    font-size: 0.8rem;
+  }
+
+  .tabela-cenario th,
+  .tabela-cenario td {
+    padding: 8px 9px;
+  }
+
+  .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tooltip {
+    max-width: min(300px, calc(100vw - 24px));
+  }
 }
 
 @media (max-width: 720px) {
@@ -1424,6 +1445,7 @@ select {
   .page-shell {
     width: min(100vw - 12px, 1480px);
     padding-top: 14px;
+    padding-bottom: 30px;
   }
 
   .hero-copy,
@@ -1446,8 +1468,18 @@ select {
     font-size: 1.7rem;
   }
 
+  h3 {
+    font-size: 1.08rem;
+    line-height: 1.24;
+  }
+
   .metrica-card {
     padding: 14px;
+  }
+
+  .metrica-resumo {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .detail-grid,
@@ -1455,6 +1487,13 @@ select {
   .bar-row,
   .stack-row {
     grid-template-columns: 1fr;
+  }
+
+  .programa-agrupamentos-grid,
+  .cartilhas-grid,
+  .charts-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .cartilha-meta {
@@ -1504,6 +1543,31 @@ select {
     font-size: 0.88rem;
   }
 
+  .comparacao-box,
+  .chart-card {
+    padding: 12px;
+  }
+
+  .campo-busca-tabela {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .paginacao-tabela {
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  #programa-paginacao-resumo {
+    white-space: normal;
+  }
+
+  .tabela-cenario {
+    min-width: 700px;
+    font-size: 0.76rem;
+  }
+
   .programa-tabela-municipios-wrap {
     max-height: 360px;
     border-radius: 14px;
@@ -1530,5 +1594,10 @@ select {
 
   .programa-tabela-municipios .coluna-municipio {
     min-width: 150px;
+  }
+
+  .botao-download {
+    width: 100%;
+    text-align: center;
   }
 }
