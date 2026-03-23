@@ -101,3 +101,27 @@ class TestBuildProgramaReformaUnit(unittest.TestCase):
         self.assertEqual("TERR-AC-01", item["id"])
         self.assertEqual([20.0, 30.0], item["centroide"])
         self.assertEqual("M 0 0 Z M 1 1 Z", item["caminho_svg"])
+
+    def test_constantes_de_cenarios_expoem_grade_esperada(self):
+        self.assertEqual([30000, 60000, 120000, 180000], self.builder_programa.POP_REFERENCIAS_CENARIO)
+        self.assertEqual({"equilibrado"}, set(self.builder_programa.PERFIL_EQUIBRADO_BASE.keys()))
+        self.assertEqual({"fiscal", "porte"}, set(self.builder_programa.PERFIS_CANDIDATOS_AB.keys()))
+
+    def test_compare_territories_detecta_municipios_e_territorios_diferentes(self):
+        rows_by_code = {
+            "1": {"codigo_ibge": "1", "nome_municipio": "A", "uf": "AC"},
+            "2": {"codigo_ibge": "2", "nome_municipio": "B", "uf": "AC"},
+            "3": {"codigo_ibge": "3", "nome_municipio": "C", "uf": "AC"},
+        }
+        base = [
+            {"municipios": ["1", "2"]},
+            {"municipios": ["3"]},
+        ]
+        comparado = [
+            {"municipios": ["1"]},
+            {"municipios": ["2", "3"]},
+        ]
+        resultado = self.builder_programa.compare_territories(base, comparado, rows_by_code)
+        self.assertEqual(3, resultado["municipios_em_territorio_diferente"])
+        self.assertGreater(resultado["territorios_com_composicao_diferente"], 0)
+        self.assertEqual("A", resultado["amostra_municipios"][0]["nome_municipio"])

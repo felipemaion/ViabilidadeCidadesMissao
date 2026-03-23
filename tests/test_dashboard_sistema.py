@@ -14,6 +14,8 @@ LINHAS_PATH = ROOT / "dashboard" / "data" / "municipality_data.json"
 MAPA_PATH = ROOT / "dashboard" / "data" / "map_paths_by_year.json"
 CLIMA_PATH = ROOT / "dashboard" / "data" / "climatologia.json"
 PROGRAMA_PATH = ROOT / "dashboard" / "data" / "programa_reforma.json"
+PERFIS_INDEX_PATH = ROOT / "dashboard" / "data" / "programa_perfis.json"
+PERFIS_DIR = ROOT / "dashboard" / "data" / "programa_perfis"
 INDEX_PATH = ROOT / "dashboard" / "index.html"
 APP_PATH = ROOT / "dashboard" / "app.js"
 README_PATH = ROOT / "README.md"
@@ -55,6 +57,7 @@ class BaseDashboardTest(unittest.TestCase):
             BaseDashboardTest.mapa = json.loads(MAPA_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.clima = json.loads(CLIMA_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.programa = json.loads(PROGRAMA_PATH.read_text(encoding="utf-8"))
+            BaseDashboardTest.perfis_programa = json.loads(PERFIS_INDEX_PATH.read_text(encoding="utf-8"))
             BaseDashboardTest.index_html = INDEX_PATH.read_text(encoding="utf-8")
             BaseDashboardTest.app_js = APP_PATH.read_text(encoding="utf-8")
             BaseDashboardTest.readme = README_PATH.read_text(encoding="utf-8")
@@ -69,6 +72,7 @@ class BaseDashboardTest(unittest.TestCase):
         cls.mapa = BaseDashboardTest.mapa
         cls.clima = BaseDashboardTest.clima
         cls.programa = BaseDashboardTest.programa
+        cls.perfis_programa = BaseDashboardTest.perfis_programa
         cls.index_html = BaseDashboardTest.index_html
         cls.app_js = BaseDashboardTest.app_js
         cls.readme = BaseDashboardTest.readme
@@ -436,6 +440,11 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("busca-municipio-input", self.index_html)
         self.assertIn("busca-municipio-sugestoes", self.index_html)
         self.assertIn("ajuda-detalhe-montagem", self.index_html)
+        self.assertIn("programa-ajuda-perfil", self.index_html)
+        self.assertIn("programa-perfil-comparacao", self.index_html)
+        self.assertIn("programa-ajuda-agrupamentos", self.index_html)
+        self.assertIn("programa-agrupamentos-resumo", self.index_html)
+        self.assertIn("programa-agrupamentos", self.index_html)
         self.assertIn("itensPorPaginaTerritoriosPrograma: 15", self.app_js)
         self.assertIn("filtrarTerritoriosMapaUnificado", self.app_js)
         self.assertIn("programa-mapa-grid", self.index_html)
@@ -444,6 +453,16 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("programa-ordenar-populacao", self.index_html)
         self.assertIn("ordenarTerritoriosMapaUnificado", self.app_js)
         self.assertIn('ordenacaoTerritoriosPrograma: { chave: "nome", direcao: "asc" }', self.app_js)
+        self.assertIn("programa-seletor-populacao", self.index_html)
+        self.assertIn("programa-seletor-perfil", self.index_html)
+        self.assertIn("programaCenarioSelecionadoId", self.app_js)
+        self.assertIn("obterCenarioProgramaAtivo", self.app_js)
+        self.assertIn("preencherControlesCenarioPrograma", self.app_js)
+        self.assertIn("obterPerfilProgramaSelecionado", self.app_js)
+        self.assertIn("criarResumoComparacaoPerfil", self.app_js)
+        self.assertIn("atualizarAjudaPerfilPrograma", self.app_js)
+        self.assertIn("renderizarAgrupamentosPrograma", self.app_js)
+        self.assertIn("atualizarAjudaAgrupamentosPrograma", self.app_js)
         self.assertIn("territorioProgramaSelecionadoId", self.app_js)
         self.assertIn("selecionarTerritorioPrograma", self.app_js)
         self.assertIn("reaplicarSelecaoTerritorioPrograma", self.app_js)
@@ -490,6 +509,7 @@ class TestProgramaReforma(BaseDashboardTest):
         self.assertIn("arquitetura_legal", self.programa)
         self.assertIn("lrg_conceitual", self.programa)
         self.assertIn("mapa_unificado", self.programa)
+        self.assertIn("perfis_json_path", self.programa["mapa_unificado"])
 
     def test_programa_reforma_tem_territorios_preliminares(self):
         territorios = self.programa["territorios_identidade"]["territorios"]
@@ -504,6 +524,8 @@ class TestProgramaReforma(BaseDashboardTest):
     def test_mapa_unificado_tem_geometrias_cenario(self):
         mapa = self.programa["mapa_unificado"]
         self.assertIn("territorios", mapa)
+        self.assertIn("cenarios", mapa)
+        self.assertIn("cenario_padrao_id", mapa)
         self.assertGreater(len(mapa["territorios"]), 20)
         amostra = mapa["territorios"][0]
         self.assertTrue(amostra["caminho_svg"].startswith("M "))
@@ -512,11 +534,61 @@ class TestProgramaReforma(BaseDashboardTest):
         self.assertEqual(len(amostra["centroide"]), 2)
         self.assertIn("receita_total_bruta_total", amostra)
 
+    def test_mapa_unificado_expoe_cenarios_parametricos(self):
+        mapa = self.programa["mapa_unificado"]
+        cenarios = mapa["cenarios"]
+        self.assertEqual(12, len(cenarios))
+        ids = {cenario["id"] for cenario in cenarios}
+        self.assertEqual(len(cenarios), len(ids))
+        self.assertIn(mapa["cenario_padrao_id"], ids)
+        amostra = cenarios[0]
+        self.assertIn("populacao_referencia", amostra)
+        self.assertIn("perfil_agregacao", amostra)
+        self.assertIn("perfil_rotulo", amostra)
+        self.assertIn("perfil_descricao", amostra)
+        self.assertIn("perfil_json_path", amostra)
+        self.assertIn("perfil_ajuda", amostra)
+        self.assertIn("comparacao_vs_equilibrado", amostra)
+        self.assertIn("comparacoes_perfis", amostra)
+        self.assertIn("territorios_identidade", amostra)
+        self.assertIn("territorios", amostra)
+
     def test_mapa_unificado_tem_populacao_brasil_consistente(self):
         territorios = self.programa["mapa_unificado"]["territorios"]
         total_cenario = sum(item["populacao_total"] for item in territorios)
         total_base = sum(linha["populacao"] for linha in self.linhas if linha["ano"] == self.programa["mapa_unificado"]["ano_referencia"])
         self.assertEqual(total_base, total_cenario)
+
+    def test_todos_os_cenarios_preservam_populacao_total(self):
+        total_base = sum(linha["populacao"] for linha in self.linhas if linha["ano"] == self.programa["mapa_unificado"]["ano_referencia"])
+        for cenario in self.programa["mapa_unificado"]["cenarios"]:
+          total_cenario = sum(item["populacao_total"] for item in cenario["territorios"])
+          self.assertEqual(total_base, total_cenario, cenario["id"])
+
+    def test_perfis_programa_tem_jsons_e_comparacoes(self):
+        self.assertTrue(PERFIS_INDEX_PATH.exists())
+        self.assertTrue(PERFIS_DIR.exists())
+        perfis = self.perfis_programa["perfis"]
+        self.assertEqual({"equilibrado", "fiscal", "porte"}, {perfil["id"] for perfil in perfis})
+        for perfil in perfis:
+            arquivo = ROOT / "dashboard" / perfil["json_path"].replace("./data/", "data/")
+            self.assertTrue(arquivo.exists(), perfil["id"])
+            self.assertIn("criterios_considerados", perfil)
+            self.assertIn("ajuda", perfil)
+            self.assertIn("ab_resultado", perfil)
+
+    def test_perfis_alternativos_realmente_mudam_territorios(self):
+        perfis = {perfil["id"]: perfil for perfil in self.perfis_programa["perfis"]}
+        for perfil_id in ("fiscal", "porte"):
+            medias = perfis[perfil_id]["ab_resultado"]
+            self.assertGreater(medias["municipios_diferentes_media"], 0, perfil_id)
+            self.assertGreater(medias["territorios_diferentes_media"], 0, perfil_id)
+
+    def test_cenarios_expoem_comparacoes_contra_todos_os_outros_perfis(self):
+        for cenario in self.programa["mapa_unificado"]["cenarios"]:
+            comparacoes = cenario["comparacoes_perfis"]
+            esperado = {"equilibrado", "fiscal", "porte"} - {cenario["perfil_agregacao"]}
+            self.assertEqual(esperado, set(comparacoes.keys()))
 
     def test_mapa_unificado_tem_mais_de_uma_pagina_de_registros(self):
         territorios = self.programa["mapa_unificado"]["territorios"]

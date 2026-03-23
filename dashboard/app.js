@@ -286,6 +286,13 @@ const elementos = {
   programaTerritorios: document.getElementById("programa-territorios"),
   programaMapaResumo: document.getElementById("programa-mapa-resumo"),
   programaMapaAviso: document.getElementById("programa-mapa-aviso"),
+  programaPerfilComparacao: document.getElementById("programa-perfil-comparacao"),
+  programaAjudaPerfil: document.getElementById("programa-ajuda-perfil"),
+  programaAjudaAgrupamentos: document.getElementById("programa-ajuda-agrupamentos"),
+  programaAgrupamentosResumo: document.getElementById("programa-agrupamentos-resumo"),
+  programaAgrupamentos: document.getElementById("programa-agrupamentos"),
+  programaSeletorPopulacao: document.getElementById("programa-seletor-populacao"),
+  programaSeletorPerfil: document.getElementById("programa-seletor-perfil"),
   programaBuscaTerritorios: document.getElementById("programa-busca-territorios"),
   programaOrdenarTerritorio: document.getElementById("programa-ordenar-territorio"),
   programaOrdenarUf: document.getElementById("programa-ordenar-uf"),
@@ -309,6 +316,7 @@ const estado = {
   caminhosPorAno: {},
   climatologia: null,
   programaReforma: null,
+  perfisPrograma: null,
   metricaAtual: "status_viabilidade",
   anoAtual: null,
   ufAtual: "TODAS",
@@ -325,6 +333,7 @@ const estado = {
   itensPorPaginaTerritoriosPrograma: 15,
   ordenacaoTerritoriosPrograma: { chave: "nome", direcao: "asc" },
   territorioProgramaSelecionadoId: null,
+  programaCenarioSelecionadoId: null,
   cacheTributosMunicipais: {},
   chaveTributosAtiva: null,
   timerBuscaTerritoriosPrograma: null,
@@ -342,12 +351,13 @@ inicializar().catch((erro) => {
 });
 
 async function inicializar() {
-  const [metadata, linhas, caminhos, climatologia, programaReforma] = await Promise.all([
+  const [metadata, linhas, caminhos, climatologia, programaReforma, perfisPrograma] = await Promise.all([
     buscarJson("./data/metadata.json"),
     buscarJson("./data/municipality_data.json"),
     buscarJson("./data/map_paths_by_year.json"),
     buscarJson("./data/climatologia.json"),
     buscarJson("./data/programa_reforma.json"),
+    buscarJson("./data/programa_perfis.json"),
   ]);
 
   estado.metadata = metadata;
@@ -355,6 +365,7 @@ async function inicializar() {
   estado.nomeMunicipioPorCodigo = construirIndiceMunicipios(linhas);
   estado.caminhosPorAno = caminhos;
   estado.climatologia = climatologia;
+  estado.perfisPrograma = perfisPrograma;
   prepararTerritoriosPrograma(programaReforma);
   estado.programaReforma = programaReforma;
   estado.anoAtual = String(metadata.filtros.anos.at(-1));
@@ -400,14 +411,21 @@ function criarTextoMontagemDetalhe(linha, metrica, tributos) {
 }
 
 function prepararTerritoriosPrograma(programaReforma) {
-  const territorios = programaReforma?.mapa_unificado?.territorios || [];
-  territorios.forEach((territorio) => {
-    const municipiosTexto = (territorio.municipios || [])
-      .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
-      .filter(Boolean)
-      .join(", ");
-    territorio._municipiosTexto = municipiosTexto;
-    territorio._termoBusca = normalizarTextoLivre([territorio.nome, territorio.uf, municipiosTexto].join(" "));
+  const prepararLista = (territorios) => {
+    (territorios || []).forEach((territorio) => {
+      const municipiosTexto = (territorio.municipios || [])
+        .map((codigo) => obterNomeMunicipioPorCodigo(codigo))
+        .filter(Boolean)
+        .join(", ");
+      territorio._municipiosTexto = municipiosTexto;
+      territorio._termoBusca = normalizarTextoLivre([territorio.nome, territorio.uf, municipiosTexto].join(" "));
+    });
+  };
+  prepararLista(programaReforma?.mapa_unificado?.territorios);
+  prepararLista(programaReforma?.territorios_identidade?.territorios);
+  (programaReforma?.mapa_unificado?.cenarios || []).forEach((cenario) => {
+    prepararLista(cenario.territorios);
+    prepararLista(cenario.territorios_identidade);
   });
 }
 
@@ -467,6 +485,12 @@ function renderizarCartilhas(narrativa) {
 function renderizarProgramaReforma() {
   const programa = estado.programaReforma;
   if (!programa) return;
+  if (!estado.programaCenarioSelecionadoId) {
+    estado.programaCenarioSelecionadoId = programa.mapa_unificado.cenario_padrao_id;
+  }
+  preencherControlesCenarioPrograma();
+  const cenario = obterCenarioProgramaAtivo();
+  const perfilAtual = obterPerfilProgramaSelecionado();
   elementos.programaResumo.textContent =
     "Camada programática separada do diagnóstico, com metodologia preliminar, cenários iniciais e arquitetura legal em curadoria.";
   elementos.programaMensagem.textContent = programa.visao_geral.mensagem_programatica;
@@ -476,29 +500,171 @@ function renderizarProgramaReforma() {
     programa.territorios_identidade.parametro_populacional_otimo
   )} habitantes e possibilidade de recalibração.`;
   elementos.programaIfdm.textContent = `${programa.visao_geral.ifdm.status.replaceAll("_", " ")}. ${programa.visao_geral.ifdm.observacao}`;
-  elementos.programaPosUnificacao.textContent = `${formatarInteiro(programa.mapa_unificado.municipios_depois)} territórios no cenário simulado, ante ${formatarInteiro(
-    programa.mapa_unificado.municipios_antes
+  elementos.programaPosUnificacao.textContent = `${formatarInteiro(cenario.municipios_depois)} territórios no cenário simulado, ante ${formatarInteiro(
+    cenario.municipios_antes
   )} municípios atuais.`;
   elementos.programaLrg.textContent = `${programa.lrg_conceitual.status.replaceAll("_", " ")}. ${programa.lrg_conceitual.aviso}`;
   elementos.programaMapaResumo.textContent = `Após a unificação preliminar, o cenário passa de ${formatarInteiro(
-    programa.mapa_unificado.municipios_antes
-  )} para ${formatarInteiro(programa.mapa_unificado.municipios_depois)} unidades territoriais, redução de ${formatarInteiro(
-    programa.mapa_unificado.reducao_absoluta
-  )} (${formatarNumero(programa.mapa_unificado.reducao_percentual, 1)}%).`;
-  elementos.programaMapaAviso.textContent = programa.mapa_unificado.escopo;
+    cenario.municipios_antes
+  )} para ${formatarInteiro(cenario.municipios_depois)} unidades territoriais, redução de ${formatarInteiro(
+    cenario.reducao_absoluta
+  )} (${formatarNumero(cenario.reducao_percentual, 1)}%).`;
+  elementos.programaMapaAviso.textContent = `${programa.mapa_unificado.escopo} Cenário ativo: ${cenario.rotulo}. ${cenario.perfil_descricao}`;
+  elementos.programaPerfilComparacao.textContent = criarResumoComparacaoPerfil(cenario, perfilAtual);
   elementos.programaCenariosAviso.textContent = programa.cenarios_amalgama.observacao_metodologica;
+  atualizarAjudaPerfilPrograma(perfilAtual, cenario);
+  atualizarAjudaAgrupamentosPrograma(cenario, perfilAtual);
 
   preencherLista(elementos.programaEixos, programa.visao_geral.eixos);
   preencherLista(elementos.programaMetodologia, programa.territorios_identidade.metodologia);
   preencherLista(elementos.programaLrgPrincipios, programa.lrg_conceitual.principios_sugeridos);
 
-  renderizarTerritoriosPrograma(programa.territorios_identidade.territorios);
-  renderizarMapaUnificadoPrograma(programa.mapa_unificado.territorios);
+  renderizarTerritoriosPrograma(cenario.territorios_identidade || programa.territorios_identidade.territorios);
+  renderizarMapaUnificadoPrograma(cenario.territorios);
   sincronizarControlesTabelaPrograma();
-  renderizarTabelaMapaUnificado(programa.mapa_unificado.territorios);
+  renderizarTabelaMapaUnificado(cenario.territorios);
+  renderizarAgrupamentosPrograma(cenario.territorios, cenario);
   renderizarCenariosPrograma(programa.cenarios_amalgama.municipios_prioritarios);
   renderizarArquiteturaLegal(programa.arquitetura_legal.eixos);
   renderizarCapitaisIfdm(programa.ifdm_capitais || []);
+}
+
+function obterCenarioProgramaAtivo() {
+  const cenarios = estado.programaReforma?.mapa_unificado?.cenarios || [];
+  return (
+    cenarios.find((item) => item.id === estado.programaCenarioSelecionadoId) ||
+    cenarios[0] ||
+    estado.programaReforma?.mapa_unificado
+  );
+}
+
+function obterPerfilProgramaSelecionado() {
+  const perfilId = obterCenarioProgramaAtivo()?.perfil_agregacao;
+  return (estado.perfisPrograma?.perfis || []).find((perfil) => perfil.id === perfilId) || null;
+}
+
+function criarResumoComparacaoPerfil(cenario, perfilAtual) {
+  const comparacoes = cenario?.comparacoes_perfis || {};
+  const perfis = (estado.perfisPrograma?.perfis || []).filter((perfil) => perfil.id !== cenario?.perfil_agregacao);
+  if (!perfis.length) {
+    return "Sem comparações disponíveis para o perfil atual.";
+  }
+  const trechos = perfis
+    .map((perfil) => {
+      const comparacao = comparacoes[perfil.id];
+      if (!comparacao) return null;
+      return `${perfil.rotulo}: ${formatarInteiro(comparacao.municipios_em_territorio_diferente)} municípios e ${formatarInteiro(
+        comparacao.territorios_com_composicao_diferente
+      )} composições diferentes`;
+    })
+    .filter(Boolean);
+  if (!trechos.length) {
+    return "Sem comparações disponíveis para o perfil atual.";
+  }
+  return `Comparação do perfil ${perfilAtual?.rotulo || cenario?.perfil_rotulo}: ${trechos.join(" · ")}.`;
+}
+
+function atualizarAjudaPerfilPrograma(perfilAtual, cenario) {
+  if (!elementos.programaAjudaPerfil) return;
+  const textoAjuda = perfilAtual?.ajuda || cenario?.perfil_ajuda || "Perfil metodológico do cenário programático.";
+  elementos.programaAjudaPerfil.dataset.ajuda = textoAjuda;
+  elementos.programaAjudaPerfil.dataset.ajudaHtml = construirAjudaHtmlPerfil(perfilAtual, cenario);
+  elementos.programaAjudaPerfil.setAttribute("aria-label", textoAjuda);
+}
+
+function atualizarAjudaAgrupamentosPrograma(cenario, perfilAtual) {
+  if (!elementos.programaAjudaAgrupamentos) return;
+  const texto = `Agrupamentos do cenário mostram, no perfil ${perfilAtual?.rotulo || cenario?.perfil_rotulo}, quais municípios foram reunidos em cada novo território para a população de referência de ${formatarInteiro(
+    cenario?.populacao_referencia || 0
+  )} habitantes. Ao clicar em um agrupamento, o mapa e a tabela são sincronizados para esse território.`;
+  elementos.programaAjudaAgrupamentos.dataset.ajuda = texto;
+  elementos.programaAjudaAgrupamentos.dataset.ajudaHtml = `
+    <div class="tooltip-ajuda-card">
+      <strong>Agrupamentos do cenário</strong>
+      <p>Esta seção transforma a simulação em uma leitura direta de composição territorial.</p>
+      <div class="tooltip-ajuda-bloco">
+        <span>O que aparece aqui</span>
+        <ul>
+          <li>cada card representa um novo território do cenário ativo</li>
+          <li>a lista de municípios mostra quem foi englobado nesse bloco</li>
+          <li>os números resumem população, dependência e autonomia do agrupamento</li>
+        </ul>
+      </div>
+      <div class="tooltip-ajuda-bloco">
+        <span>Como usar</span>
+        <ul>
+          <li>clique em um agrupamento para destacar o território no mapa</li>
+          <li>use a busca da tabela ao lado para localizar um município e ver em qual agrupamento ele cai</li>
+          <li>troque perfil e população de referência para comparar como a composição muda</li>
+        </ul>
+      </div>
+    </div>
+  `;
+  elementos.programaAjudaAgrupamentos.setAttribute("aria-label", texto);
+}
+
+function construirAjudaHtmlPerfil(perfilAtual, cenario) {
+  const criterios = (perfilAtual?.criterios_considerados || cenario?.perfil_criterios_considerados || [])
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  const blocosComparacao = Object.entries(cenario?.comparacoes_perfis || {})
+    .map(([perfilId, comparacao]) => {
+      const perfil = (estado.perfisPrograma?.perfis || []).find((item) => item.id === perfilId);
+      const amostra = (comparacao?.amostra_municipios || [])
+        .slice(0, 4)
+        .map((item) => `<li>${escapeHtml(item.nome_municipio)} (${escapeHtml(item.uf)})</li>`)
+        .join("");
+      return `
+        <div class="tooltip-ajuda-subbloco">
+          <span>Vs ${escapeHtml(perfil?.rotulo || perfilId)}</span>
+          <p>Muda ${formatarInteiro(comparacao.municipios_em_territorio_diferente)} municípios e ${formatarInteiro(
+            comparacao.territorios_com_composicao_diferente
+          )} composições territoriais.</p>
+          ${amostra ? `<ul>${amostra}</ul>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="tooltip-ajuda-card">
+      <strong>${escapeHtml(perfilAtual?.rotulo || cenario?.perfil_rotulo || "Perfil de agregação")}</strong>
+      <p>${escapeHtml(perfilAtual?.descricao || cenario?.perfil_descricao || "Perfil metodológico do cenário.")}</p>
+      <div class="tooltip-ajuda-bloco">
+        <span>O que este perfil prioriza</span>
+        <ul>${criterios || "<li>Sem critérios detalhados no perfil atual.</li>"}</ul>
+      </div>
+      <div class="tooltip-ajuda-bloco">
+        <span>Comparações deste cenário</span>
+        ${blocosComparacao || "<p>Sem comparações adicionais disponíveis para este perfil.</p>"}
+      </div>
+    </div>
+  `;
+}
+
+function preencherControlesCenarioPrograma() {
+  const cenarios = estado.programaReforma?.mapa_unificado?.cenarios || [];
+  const populacoes = [...new Set(cenarios.map((cenario) => cenario.populacao_referencia))].sort((a, b) => a - b);
+  const perfis = [];
+  const vistos = new Set();
+  cenarios.forEach((cenario) => {
+    if (vistos.has(cenario.perfil_agregacao)) return;
+    vistos.add(cenario.perfil_agregacao);
+    perfis.push({ id: cenario.perfil_agregacao, rotulo: cenario.perfil_rotulo });
+  });
+
+  elementos.programaSeletorPopulacao.innerHTML = populacoes
+    .map((valor) => `<option value="${valor}">${formatarInteiro(valor)} habitantes</option>`)
+    .join("");
+  elementos.programaSeletorPerfil.innerHTML = perfis
+    .map((perfil) => `<option value="${perfil.id}">${perfil.rotulo}</option>`)
+    .join("");
+
+  const ativo = obterCenarioProgramaAtivo();
+  if (ativo) {
+    elementos.programaSeletorPopulacao.value = String(ativo.populacao_referencia);
+    elementos.programaSeletorPerfil.value = ativo.perfil_agregacao;
+  }
 }
 
 function preencherCardCartilha(cartilha, elementosCard) {
@@ -612,6 +778,57 @@ function renderizarTabelaMapaUnificado(territorios) {
   sincronizarCabecalhosTabelaPrograma();
 }
 
+function obterRecorteTerritoriosPrograma(territorios) {
+  const territoriosFiltradosBase = ordenarTerritoriosMapaUnificado(filtrarTerritoriosMapaUnificado(territorios || []));
+  const territoriosFiltrados = estado.territorioProgramaSelecionadoId
+    ? territoriosFiltradosBase.filter((territorio) => territorio.id === estado.territorioProgramaSelecionadoId)
+    : territoriosFiltradosBase;
+  const totalPaginas = Math.max(1, Math.ceil(territoriosFiltrados.length / estado.itensPorPaginaTerritoriosPrograma));
+  const paginaAtual = Math.min(Math.max(1, estado.paginaTerritoriosPrograma), totalPaginas);
+  const inicio = (paginaAtual - 1) * estado.itensPorPaginaTerritoriosPrograma;
+  return {
+    territoriosFiltradosBase,
+    territoriosFiltrados,
+    totalPaginas,
+    paginaAtual,
+    territoriosDaPagina: territoriosFiltrados.slice(inicio, inicio + estado.itensPorPaginaTerritoriosPrograma),
+  };
+}
+
+function renderizarAgrupamentosPrograma(territorios, cenario) {
+  if (!elementos.programaAgrupamentos) return;
+  elementos.programaAgrupamentos.innerHTML = "";
+  const { territoriosFiltrados, territoriosDaPagina, totalPaginas, paginaAtual } = obterRecorteTerritoriosPrograma(territorios);
+  elementos.programaAgrupamentosResumo.textContent = `Cenário ativo: ${cenario.rotulo}. Exibindo ${formatarInteiro(
+    territoriosDaPagina.length
+  )} agrupamentos nesta página, de ${formatarInteiro(territoriosFiltrados.length)} no filtro atual.`;
+
+  if (!territoriosDaPagina.length) {
+    elementos.programaAgrupamentos.innerHTML = '<div class="empty-state">Nenhum agrupamento encontrado para o filtro atual.</div>';
+    return;
+  }
+
+  territoriosDaPagina.forEach((territorio) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `programa-card programa-agrupamento-card${
+      territorio.id === estado.territorioProgramaSelecionadoId ? " programa-agrupamento-card-ativo" : ""
+    }`;
+    card.innerHTML = `
+      <span>${territorio.nome}</span>
+      <strong>${formatarInteiro(territorio.populacao_total)} hab. · ${territorio.quantidade_municipios} municípios</strong>
+      <small>Perfil: ${cenario.perfil_rotulo} · Referência: ${formatarInteiro(cenario.populacao_referencia)} hab.</small>
+      <small>Autonomia média: ${formatarNumero(territorio.autonomia_media, 2)} · Dependência média: ${formatarNumero(
+        territorio.dependencia_media,
+        1
+      )}%</small>
+      <small>Municípios englobados: ${territorio._municipiosTexto || "Sem detalhamento nominal disponível."}</small>
+    `;
+    card.addEventListener("click", () => selecionarTerritorioPrograma(territorio.id));
+    elementos.programaAgrupamentos.appendChild(card);
+  });
+}
+
 function sincronizarControlesTabelaPrograma() {
   elementos.programaBuscaTerritorios.value = estado.buscaTerritoriosPrograma;
 }
@@ -655,7 +872,7 @@ function sincronizarCabecalhosTabelaPrograma() {
 }
 
 function selecionarTerritorioPrograma(territorioId) {
-  const territorios = estado.programaReforma?.mapa_unificado?.territorios || [];
+  const territorios = obterCenarioProgramaAtivo()?.territorios || [];
   const territorioSelecionado = territorios.find((territorio) => territorio.id === territorioId) || null;
   estado.territorioProgramaSelecionadoId = territorioId;
   if (territorioSelecionado) {
@@ -664,6 +881,7 @@ function selecionarTerritorioPrograma(territorioId) {
   }
   renderizarMapaUnificadoPrograma(territorios);
   renderizarTabelaMapaUnificado(territorios);
+  renderizarAgrupamentosPrograma(territorios, obterCenarioProgramaAtivo());
   requestAnimationFrame(() => {
     focarTerritorioProgramaNoMapa(territorioId);
     const linha = elementos.programaTabelaTerritorios.querySelector(`tr[data-territorio-id="${territorioId}"]`);
@@ -701,7 +919,10 @@ function aplicarBuscaTerritoriosPrograma(termo) {
   estado.buscaTerritoriosPrograma = termo || "";
   resetarInteracaoPrograma({ manterBusca: true });
   atualizarInteracaoProgramaSemRecriarMapa();
-  renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+  const territorios = obterCenarioProgramaAtivo()?.territorios || [];
+  const cenario = obterCenarioProgramaAtivo();
+  renderizarTabelaMapaUnificado(territorios);
+  renderizarAgrupamentosPrograma(territorios, cenario);
 }
 
 function renderizarArquiteturaLegal(eixos) {
@@ -890,7 +1111,7 @@ function limparDestaqueMunicipiosPrograma() {
 }
 
 function reaplicarSelecaoTerritorioPrograma() {
-  const territorios = estado.programaReforma?.mapa_unificado?.territorios || [];
+  const territorios = obterCenarioProgramaAtivo()?.territorios || [];
   const territorio = territorios.find((item) => item.id === estado.territorioProgramaSelecionadoId);
   if (!territorio) {
     limparDestaqueMunicipiosPrograma();
@@ -1042,6 +1263,20 @@ function registrarEventos() {
       aplicarBuscaTerritoriosPrograma(termo);
     }, 120);
   });
+  const atualizarCenarioPrograma = () => {
+    const populacao = Number(elementos.programaSeletorPopulacao.value || 0);
+    const perfil = elementos.programaSeletorPerfil.value;
+    const cenarios = estado.programaReforma?.mapa_unificado?.cenarios || [];
+    const proximo = cenarios.find(
+      (cenario) => cenario.populacao_referencia === populacao && cenario.perfil_agregacao === perfil
+    );
+    if (!proximo) return;
+    estado.programaCenarioSelecionadoId = proximo.id;
+    resetarInteracaoPrograma();
+    renderizarProgramaReforma();
+  };
+  elementos.programaSeletorPopulacao.addEventListener("change", atualizarCenarioPrograma);
+  elementos.programaSeletorPerfil.addEventListener("change", atualizarCenarioPrograma);
   [elementos.programaOrdenarTerritorio, elementos.programaOrdenarUf, elementos.programaOrdenarPopulacao].forEach((botao) => {
     botao.addEventListener("click", () => {
       const chave = botao.dataset.sortKey;
@@ -1052,16 +1287,25 @@ function registrarEventos() {
         estado.ordenacaoTerritoriosPrograma = { chave, direcao: chave === "populacao_total" ? "desc" : "asc" };
       }
       estado.paginaTerritoriosPrograma = 1;
-      renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+      const territorios = obterCenarioProgramaAtivo()?.territorios || [];
+      const cenario = obterCenarioProgramaAtivo();
+      renderizarTabelaMapaUnificado(territorios);
+      renderizarAgrupamentosPrograma(territorios, cenario);
     });
   });
   elementos.programaPaginaAnterior.addEventListener("click", () => {
     estado.paginaTerritoriosPrograma = Math.max(1, estado.paginaTerritoriosPrograma - 1);
-    renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+    const territorios = obterCenarioProgramaAtivo()?.territorios || [];
+    const cenario = obterCenarioProgramaAtivo();
+    renderizarTabelaMapaUnificado(territorios);
+    renderizarAgrupamentosPrograma(territorios, cenario);
   });
   elementos.programaPaginaProxima.addEventListener("click", () => {
     estado.paginaTerritoriosPrograma += 1;
-    renderizarTabelaMapaUnificado(estado.programaReforma?.mapa_unificado?.territorios || []);
+    const territorios = obterCenarioProgramaAtivo()?.territorios || [];
+    const cenario = obterCenarioProgramaAtivo();
+    renderizarTabelaMapaUnificado(territorios);
+    renderizarAgrupamentosPrograma(territorios, cenario);
   });
   elementos.buscaMunicipioInput.addEventListener("input", (evento) => {
     const termo = evento.target.value || "";
@@ -1358,9 +1602,11 @@ function aplicarAcaoControleMapa(chaveMapa, acao) {
   if (acao === "reset") {
     if (chaveMapa === "programa") {
       resetarInteracaoPrograma();
-      const territorios = estado.programaReforma?.mapa_unificado?.territorios || [];
+      const territorios = obterCenarioProgramaAtivo()?.territorios || [];
+      const cenario = obterCenarioProgramaAtivo();
       renderizarMapaUnificadoPrograma(territorios);
       renderizarTabelaMapaUnificado(territorios);
+      renderizarAgrupamentosPrograma(territorios, cenario);
       return;
     }
     transform.escala = 1;
@@ -1979,9 +2225,10 @@ function posicionarTooltip(evento) {
 
 function mostrarTooltipAjuda(alvo, evento) {
   const texto = alvo.dataset.ajuda || alvo.getAttribute("aria-label") || "";
+  const html = alvo.dataset.ajudaHtml || "";
   if (!texto) return;
   elementos.tooltipAjuda.classList.remove("hidden");
-  elementos.tooltipAjuda.innerHTML = texto;
+  elementos.tooltipAjuda.innerHTML = html || texto;
   posicionarTooltipAjuda(evento);
 }
 

@@ -288,6 +288,25 @@
               <h3>Mapa simulado dos municípios unificados</h3>
               <p id="programa-mapa-resumo" class="muted"></p>
               <p id="programa-mapa-aviso" class="muted"></p>
+              <div class="filters filters-programa-mapa">
+                <label>
+                  População de referência
+                  <select id="programa-seletor-populacao"></select>
+                </label>
+                <label>
+                  <span class="label-inline-ajuda">
+                    Perfil de agregação
+                    <button
+                      id="programa-ajuda-perfil"
+                      class="ajuda-indicador"
+                      type="button"
+                      aria-label="Explicação do perfil de agregação"
+                    >?</button>
+                  </span>
+                  <select id="programa-seletor-perfil"></select>
+                </label>
+              </div>
+              <p id="programa-perfil-comparacao" class="muted"></p>
               <div class="programa-mapa-grid">
                 <div class="map-frame map-frame-programa">
                   <div class="map-controls" aria-label="Controles do mapa simulado">
@@ -367,6 +386,19 @@
                   </div>
                 </div>
               </div>
+            </article>
+            <article class="chart-card chart-card-programa-agrupamentos">
+              <h3 class="titulo-com-ajuda">
+                <span>Agrupamentos do cenário</span>
+                <button
+                  id="programa-ajuda-agrupamentos"
+                  class="ajuda-indicador"
+                  type="button"
+                  aria-label="Explicação dos agrupamentos do cenário"
+                >?</button>
+              </h3>
+              <p id="programa-agrupamentos-resumo" class="muted"></p>
+              <div id="programa-agrupamentos" class="programa-agrupamentos-grid"></div>
             </article>
             <article class="chart-card">
               <h3>Arquitetura legal e transição</h3>
