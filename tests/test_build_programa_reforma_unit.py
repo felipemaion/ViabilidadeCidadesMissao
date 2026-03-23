@@ -125,3 +125,31 @@ class TestBuildProgramaReformaUnit(unittest.TestCase):
         self.assertEqual(3, resultado["municipios_em_territorio_diferente"])
         self.assertGreater(resultado["territorios_com_composicao_diferente"], 0)
         self.assertEqual("A", resultado["amostra_municipios"][0]["nome_municipio"])
+
+    def test_aggregate_territory_metrics_recalcula_dependencia_por_agregado(self):
+        rows = [
+            {
+                "populacao": 1000,
+                "pct_dependencia_transf": 50.0,
+                "autonomia_fiscal": 10.0,
+                "receita_total_bruta": 100.0,
+                "transferencias_total": 50.0,
+                "receita_sem_transferencias_principais": 50.0,
+                "receita_tributaria_mun": 20.0,
+                "ifdm_geral": 0.4,
+            },
+            {
+                "populacao": 120000,
+                "pct_dependencia_transf": 20.0,
+                "autonomia_fiscal": 40.0,
+                "receita_total_bruta": 1000.0,
+                "transferencias_total": 200.0,
+                "receita_sem_transferencias_principais": 800.0,
+                "receita_tributaria_mun": 350.0,
+                "ifdm_geral": 0.8,
+            },
+        ]
+        agregado = self.builder_programa.aggregate_territory_metrics(rows)
+        self.assertAlmostEqual(250.0 / 1100.0 * 100, agregado["dependencia_media"], places=3)
+        self.assertAlmostEqual(850.0 / 1100.0 * 100, agregado["autonomia_media"], places=3)
+        self.assertEqual(35.0, agregado["dependencia_media_simples"])

@@ -309,6 +309,31 @@ def mean(values):
     return sum(values) / len(values) if values else None
 
 
+def safe_sum(values):
+    return sum((value or 0) for value in values)
+
+
+def safe_ratio(numerator, denominator):
+    if not denominator:
+        return 0
+    return (numerator / denominator) * 100
+
+
+def weighted_mean(rows, value_key, weight_key="populacao"):
+    numerador = 0
+    denominador = 0
+    for row in rows:
+        valor = row.get(value_key)
+        peso = row.get(weight_key) or 0
+        if valor is None or peso <= 0:
+            continue
+        numerador += valor * peso
+        denominador += peso
+    if not denominador:
+        return mean([row.get(value_key) for row in rows]) or 0
+    return numerador / denominador
+
+
 def normalize_text(value):
     text = str(value or "").strip()
     text = unicodedata.normalize("NFKD", text)
@@ -320,6 +345,71 @@ def normalize_text(value):
 def status_predominante(rows):
     contagem = Counter(row.get("status_viabilidade") or "Sem dado" for row in rows)
     return contagem.most_common(1)[0][0] if contagem else "Sem dado"
+
+
+def aggregate_territory_metrics(rows):
+    populacao_total = safe_sum(row.get("populacao") for row in rows)
+    receita_total_bruta = safe_sum(row.get("receita_total_bruta") for row in rows)
+    receita_corrente_bruta = safe_sum(row.get("receita_corrente_bruta") for row in rows)
+    receita_total_liquida = safe_sum(row.get("receita_total_liquida") for row in rows)
+    receita_corrente_liquida = safe_sum(row.get("receita_corrente_liquida") for row in rows)
+    transferencias_total = safe_sum(row.get("transferencias_total") for row in rows)
+    receita_tributaria = safe_sum(row.get("receita_tributaria_mun") for row in rows)
+    receita_sem_transferencias = safe_sum(row.get("receita_sem_transferencias_principais") for row in rows)
+    despesa_total = safe_sum(row.get("despesa_total") for row in rows)
+    despesa_pessoal = safe_sum(row.get("despesa_pessoal") for row in rows)
+    despesa_custeio = safe_sum(row.get("despesa_custeio") for row in rows)
+    despesa_investimento = safe_sum(row.get("despesa_investimento") for row in rows)
+    fpm_total = safe_sum(row.get("fpm_valor") for row in rows)
+    fundeb_total = safe_sum(row.get("fundeb_valor") for row in rows)
+    sus_total = safe_sum(row.get("sus_valor") for row in rows)
+    icms_total = safe_sum(row.get("icms_valor") for row in rows)
+    ipva_total = safe_sum(row.get("ipva_valor") for row in rows)
+    iptu_total = safe_sum(row.get("IPTU") for row in rows)
+    iss_total = safe_sum(row.get("ISS") for row in rows)
+    itbi_total = safe_sum(row.get("ITBI") for row in rows)
+
+    return {
+        "populacao_total": populacao_total,
+        "receita_total_bruta_total": receita_total_bruta,
+        "receita_corrente_bruta_total": receita_corrente_bruta,
+        "receita_total_liquida_total": receita_total_liquida,
+        "receita_corrente_liquida_total": receita_corrente_liquida,
+        "transferencias_total": transferencias_total,
+        "receita_tributaria_total": receita_tributaria,
+        "receita_sem_transferencias_total": receita_sem_transferencias,
+        "despesa_total": despesa_total,
+        "despesa_pessoal": despesa_pessoal,
+        "despesa_custeio": despesa_custeio,
+        "despesa_investimento": despesa_investimento,
+        "bolsa_familia_total": safe_sum(row.get("bolsa_familia_total") for row in rows),
+        "fpm_total": fpm_total,
+        "fundeb_total": fundeb_total,
+        "sus_total": sus_total,
+        "icms_total": icms_total,
+        "ipva_total": ipva_total,
+        "iptu_total": iptu_total,
+        "iss_total": iss_total,
+        "itbi_total": itbi_total,
+        "dependencia_media_simples": round(mean([row.get("pct_dependencia_transf") for row in rows]) or 0, 3),
+        "autonomia_media_simples": round(mean([row.get("autonomia_fiscal") for row in rows]) or 0, 3),
+        "dependencia_media": round(safe_ratio(transferencias_total, receita_total_bruta), 3),
+        "autonomia_media": round(safe_ratio(receita_sem_transferencias, receita_total_bruta), 3),
+        "ifdm_medio": round(weighted_mean(rows, "ifdm_geral"), 3),
+        "ifdm_educacao_medio": round(weighted_mean(rows, "ifdm_educacao"), 3),
+        "ifdm_saude_medio": round(weighted_mean(rows, "ifdm_saude"), 3),
+        "ifdm_emprego_renda_medio": round(weighted_mean(rows, "ifdm_emprego_renda"), 3),
+        "receita_propria_per_capita_territorial": round((receita_tributaria / populacao_total), 2) if populacao_total else 0,
+        "capacidade_investimento_media": round(weighted_mean(rows, "capacidade_investimento"), 3),
+        "margem_orcamentaria_media": round(weighted_mean(rows, "margem_orcamentaria"), 3),
+        "pessoal_per_capita_territorial": round((despesa_pessoal / populacao_total), 2) if populacao_total else 0,
+        "fpm_pct_bruta_territorial": round(safe_ratio(fpm_total, receita_total_bruta), 3),
+        "fundeb_pct_bruta_territorial": round(safe_ratio(fundeb_total, receita_total_bruta), 3),
+        "sus_pct_bruta_territorial": round(safe_ratio(sus_total, receita_total_bruta), 3),
+        "icms_pct_bruta_territorial": round(safe_ratio(icms_total, receita_total_bruta), 3),
+        "ipva_pct_bruta_territorial": round(safe_ratio(ipva_total, receita_total_bruta), 3),
+        "pct_tributaria_bruta_territorial": round(safe_ratio(receita_tributaria, receita_total_bruta), 3),
+    }
 
 
 def normalize_series(values):
@@ -458,7 +548,8 @@ def build_territories(rows, pop_referencia=POP_REFERENCIA, perfil=None, adjacenc
         def flush(lote_codigos):
             nonlocal indice
             lote = [rows_by_code[codigo] for codigo in lote_codigos]
-            populacao_acumulada = sum((row.get("populacao") or 0) for row in lote)
+            agregados = aggregate_territory_metrics(lote)
+            populacao_acumulada = agregados["populacao_total"]
             territorios.append(
                 {
                     "id": f"TERR-{uf}-{indice:02d}",
@@ -466,17 +557,12 @@ def build_territories(rows, pop_referencia=POP_REFERENCIA, perfil=None, adjacenc
                     "uf": uf,
                     "municipios": [row["codigo_ibge"] for row in lote],
                     "quantidade_municipios": len(lote),
-                    "populacao_total": sum((row.get("populacao") or 0) for row in lote),
-                    "autonomia_media": round(mean([row.get("autonomia_fiscal") for row in lote]) or 0, 3),
-                    "dependencia_media": round(mean([row.get("pct_dependencia_transf") for row in lote]) or 0, 3),
-                    "ifdm_medio": round(mean([row.get("ifdm_geral") for row in lote]) or 0, 3),
-                    "receita_total_bruta_total": sum((row.get("receita_total_bruta") or 0) for row in lote),
-                    "bolsa_familia_total": sum((row.get("bolsa_familia_total") or 0) for row in lote),
                     "status_predominante": status_predominante(lote),
                     "perfil_agregacao": resolve_profile_id(perfil),
                     "alinhamento_populacional": "acima_da_referencia"
                     if populacao_acumulada > pop_referencia
                     else "dentro_da_referencia",
+                    **agregados,
                 }
             )
             indice += 1
@@ -868,8 +954,42 @@ def build_unified_map(territorios, rows):
                 "populacao_total": territorio["populacao_total"],
                 "autonomia_media": territorio["autonomia_media"],
                 "dependencia_media": territorio["dependencia_media"],
+                "autonomia_media_simples": territorio.get("autonomia_media_simples"),
+                "dependencia_media_simples": territorio.get("dependencia_media_simples"),
                 "ifdm_medio": territorio.get("ifdm_medio"),
+                "ifdm_educacao_medio": territorio.get("ifdm_educacao_medio"),
+                "ifdm_saude_medio": territorio.get("ifdm_saude_medio"),
+                "ifdm_emprego_renda_medio": territorio.get("ifdm_emprego_renda_medio"),
                 "receita_total_bruta_total": territorio.get("receita_total_bruta_total"),
+                "receita_corrente_bruta_total": territorio.get("receita_corrente_bruta_total"),
+                "receita_total_liquida_total": territorio.get("receita_total_liquida_total"),
+                "receita_corrente_liquida_total": territorio.get("receita_corrente_liquida_total"),
+                "transferencias_total": territorio.get("transferencias_total"),
+                "receita_tributaria_total": territorio.get("receita_tributaria_total"),
+                "receita_sem_transferencias_total": territorio.get("receita_sem_transferencias_total"),
+                "receita_propria_per_capita_territorial": territorio.get("receita_propria_per_capita_territorial"),
+                "despesa_total": territorio.get("despesa_total"),
+                "despesa_pessoal": territorio.get("despesa_pessoal"),
+                "despesa_custeio": territorio.get("despesa_custeio"),
+                "despesa_investimento": territorio.get("despesa_investimento"),
+                "capacidade_investimento_media": territorio.get("capacidade_investimento_media"),
+                "margem_orcamentaria_media": territorio.get("margem_orcamentaria_media"),
+                "pessoal_per_capita_territorial": territorio.get("pessoal_per_capita_territorial"),
+                "bolsa_familia_total": territorio.get("bolsa_familia_total"),
+                "fpm_total": territorio.get("fpm_total"),
+                "fundeb_total": territorio.get("fundeb_total"),
+                "sus_total": territorio.get("sus_total"),
+                "icms_total": territorio.get("icms_total"),
+                "ipva_total": territorio.get("ipva_total"),
+                "iptu_total": territorio.get("iptu_total"),
+                "iss_total": territorio.get("iss_total"),
+                "itbi_total": territorio.get("itbi_total"),
+                "fpm_pct_bruta_territorial": territorio.get("fpm_pct_bruta_territorial"),
+                "fundeb_pct_bruta_territorial": territorio.get("fundeb_pct_bruta_territorial"),
+                "sus_pct_bruta_territorial": territorio.get("sus_pct_bruta_territorial"),
+                "icms_pct_bruta_territorial": territorio.get("icms_pct_bruta_territorial"),
+                "ipva_pct_bruta_territorial": territorio.get("ipva_pct_bruta_territorial"),
+                "pct_tributaria_bruta_territorial": territorio.get("pct_tributaria_bruta_territorial"),
                 "status_predominante": territorio["status_predominante"],
                 "municipios": territorio["municipios"],
                 "caminho_svg": " ".join(caminhos),

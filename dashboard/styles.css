@@ -1175,6 +1175,98 @@ select {
   background: rgba(29, 107, 82, 0.09);
 }
 
+.programa-detalhe-territorio {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(24, 36, 31, 0.08);
+}
+
+.programa-detalhe-header {
+  margin-bottom: 10px;
+}
+
+.detail-grid-programa {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.programa-municipios-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.programa-municipio-chip {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(29, 107, 82, 0.08);
+  border: 1px solid rgba(29, 107, 82, 0.12);
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.programa-tabela-municipios-bloco {
+  margin-top: 18px;
+}
+
+.titulo-secundario-programa {
+  margin-bottom: 10px;
+}
+
+.programa-tabela-municipios-wrap {
+  max-height: 420px;
+}
+
+.programa-tabela-municipios {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+  font-size: 0.84rem;
+}
+
+.programa-tabela-municipios th,
+.programa-tabela-municipios td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(24, 36, 31, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.programa-tabela-municipios thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(250, 247, 238, 0.96);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.programa-tabela-municipios thead .programa-tabela-municipios-tipo th {
+  top: 40px;
+  z-index: 1;
+  background: rgba(247, 245, 238, 0.98);
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.programa-tabela-municipios tfoot th,
+.programa-tabela-municipios tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: rgba(245, 241, 231, 0.98);
+  font-weight: 700;
+}
+
+.programa-tabela-municipios .coluna-municipio {
+  min-width: 180px;
+}
+
 .site-footer {
   padding: 22px 6px 6px;
   text-align: center;
@@ -1208,6 +1300,10 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .detail-grid-programa {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .explorer-layout {
     grid-template-columns: 1fr;
   }
@@ -1219,6 +1315,10 @@ select {
   }
 
   .programa-mapa-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid-programa {
     grid-template-columns: 1fr;
   }
 

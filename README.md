@@ -14,6 +14,7 @@ Este projeto organiza os dados-fonte em [`data/fontes/`](/Users/maion/Projects/C
 
 ```bash
 npm run build-data
+npm run build-programa
 npm run preparar-publicacao
 npm run test
 npm run serve
@@ -28,8 +29,7 @@ O dashboard e totalmente estatico, entao voce pode publica-lo sem backend.
 1. Rode:
 
 ```bash
-npm run build-data
-npm run preparar-publicacao
+npm run build-site
 ```
 
 2. Isso vai gerar a pasta [`dist/`](/Users/maion/Projects/CidadesMissao/dist).
@@ -44,8 +44,8 @@ npm run preparar-publicacao
   - basta conectar o repositorio e publicar
 - Vercel:
   - o arquivo [`vercel.json`](/Users/maion/Projects/CidadesMissao/vercel.json) ja esta pronto
-  - a Vercel publica diretamente a pasta [`dashboard/`](/Users/maion/Projects/CidadesMissao/dashboard)
-  - nao depende das bases brutas para gerar a publicacao
+  - a Vercel passa a gerar a pasta [`dist/`](/Users/maion/Projects/CidadesMissao/dist) no build
+  - o artefato [`dashboard/data/programa_reforma.json`](/Users/maion/Projects/CidadesMissao/dashboard/data/programa_reforma.json) e reconstruido no deploy a partir dos JSONs versionados em [`dashboard/data/`](/Users/maion/Projects/CidadesMissao/dashboard/data)
 
 ### O que sera publicado
 
@@ -59,11 +59,11 @@ npm run preparar-publicacao
 Sempre que houver mudanca nos dados ou na interface, rode novamente:
 
 ```bash
-npm run build-data
-npm run preparar-publicacao
+npm run build-site
 ```
 
 As bases em [`data/fontes/`](/Users/maion/Projects/CidadesMissao/data/fontes) e [`data/raw/`](/Users/maion/Projects/CidadesMissao/data/raw) ficam para reconstrucao local. Elas nao precisam ir para o GitHub nem para a Vercel.
+O arquivo [`dashboard/data/programa_reforma.json`](/Users/maion/Projects/CidadesMissao/dashboard/data/programa_reforma.json) tambem nao precisa mais ser versionado: ele e regenerado no build a partir de [`dashboard/data/municipality_data.json`](/Users/maion/Projects/CidadesMissao/dashboard/data/municipality_data.json) e [`dashboard/data/map_paths_by_year.json`](/Users/maion/Projects/CidadesMissao/dashboard/data/map_paths_by_year.json).
 
 ## Garantias implementadas
 

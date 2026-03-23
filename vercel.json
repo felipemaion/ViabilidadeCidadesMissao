@@ -1,14 +1,6 @@
 {
+  "buildCommand": "npm run build-site",
+  "outputDirectory": "dist",
   "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/dashboard/"
-    },
-    {
-      "source": "/:path((?!api/).*)",
-      "destination": "/dashboard/:path"
-    }
-  ]
+  "trailingSlash": false
 }

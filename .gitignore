@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 data/fontes/
 data/raw/
+dashboard/data/programa_reforma.json

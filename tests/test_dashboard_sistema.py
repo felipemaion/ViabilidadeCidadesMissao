@@ -445,6 +445,16 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("programa-ajuda-agrupamentos", self.index_html)
         self.assertIn("programa-agrupamentos-resumo", self.index_html)
         self.assertIn("programa-agrupamentos", self.index_html)
+        self.assertIn("programa-detalhe-territorio", self.index_html)
+        self.assertIn("programa-ajuda-detalhe-territorio", self.index_html)
+        self.assertIn("programa-detalhe-territorio-kpis", self.index_html)
+        self.assertIn("programa-detalhe-municipios", self.index_html)
+        self.assertIn("programa-ajuda-tabela-municipios", self.index_html)
+        self.assertIn("programa-tabela-municipios-head", self.index_html)
+        self.assertIn("programa-tabela-municipios-body", self.index_html)
+        self.assertIn("programa-tabela-municipios-foot", self.index_html)
+        self.assertIn("Território consolidado", self.app_js)
+        self.assertIn("programa-tabela-municipios-tipo", self.app_js)
         self.assertIn("itensPorPaginaTerritoriosPrograma: 15", self.app_js)
         self.assertIn("filtrarTerritoriosMapaUnificado", self.app_js)
         self.assertIn("programa-mapa-grid", self.index_html)
@@ -463,6 +473,15 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("atualizarAjudaPerfilPrograma", self.app_js)
         self.assertIn("renderizarAgrupamentosPrograma", self.app_js)
         self.assertIn("atualizarAjudaAgrupamentosPrograma", self.app_js)
+        self.assertIn("renderizarDetalheTerritorioPrograma", self.app_js)
+        self.assertIn("atualizarAjudaDetalheTerritorioPrograma", self.app_js)
+        self.assertIn("renderizarTabelaMunicipiosTerritorioPrograma", self.app_js)
+        self.assertIn("atualizarAjudaTabelaMunicipiosTerritorioPrograma", self.app_js)
+        self.assertIn("obterExplicacoesIndicadoresTerritorio", self.app_js)
+        self.assertIn("formatarPercentual", self.app_js)
+        self.assertIn("obterConsolidadoTerritorioComTributos", self.app_js)
+        self.assertIn("carregarTributosTerritorioPrograma", self.app_js)
+        self.assertIn("carregarTributosMunicipaisComCallback", self.app_js)
         self.assertIn("territorioProgramaSelecionadoId", self.app_js)
         self.assertIn("selecionarTerritorioPrograma", self.app_js)
         self.assertIn("reaplicarSelecaoTerritorioPrograma", self.app_js)
@@ -499,6 +518,9 @@ class TestFrontendEmPortugues(BaseDashboardTest):
         self.assertIn("programa-overlay-municipio", self.app_js)
         self.assertIn("/api/tributos", self.app_js)
         self.assertIn("cacheTributosMunicipais", self.app_js)
+        self.assertIn("Transferências totais agregadas divididas pela receita total bruta agregada.", self.app_js)
+        self.assertIn("Média aritmética simples dos percentuais municipais de dependência.", self.app_js)
+        self.assertIn("Tributos municipais priorizam a integração oficial com Siconfi/Tesouro", self.app_js)
 
 
 class TestProgramaReforma(BaseDashboardTest):
@@ -533,6 +555,14 @@ class TestProgramaReforma(BaseDashboardTest):
         self.assertGreaterEqual(amostra["quantidade_municipios"], 1)
         self.assertEqual(len(amostra["centroide"]), 2)
         self.assertIn("receita_total_bruta_total", amostra)
+        self.assertIn("transferencias_total", amostra)
+        self.assertIn("receita_tributaria_total", amostra)
+        self.assertIn("dependencia_media_simples", amostra)
+        self.assertIn("autonomia_media_simples", amostra)
+        self.assertIn("receita_propria_per_capita_territorial", amostra)
+        self.assertIn("iptu_total", amostra)
+        self.assertIn("iss_total", amostra)
+        self.assertIn("itbi_total", amostra)
 
     def test_mapa_unificado_expoe_cenarios_parametricos(self):
         mapa = self.programa["mapa_unificado"]
@@ -558,6 +588,18 @@ class TestProgramaReforma(BaseDashboardTest):
         total_cenario = sum(item["populacao_total"] for item in territorios)
         total_base = sum(linha["populacao"] for linha in self.linhas if linha["ano"] == self.programa["mapa_unificado"]["ano_referencia"])
         self.assertEqual(total_base, total_cenario)
+
+    def test_consolidado_territorial_tem_indicadores_recalculados(self):
+        cenario = next(
+            item for item in self.programa["mapa_unificado"]["cenarios"] if item["id"] == self.programa["mapa_unificado"]["cenario_padrao_id"]
+        )
+        amostra = next(item for item in cenario["territorios"] if item["quantidade_municipios"] > 1)
+        self.assertIsNotNone(amostra["dependencia_media"])
+        self.assertIsNotNone(amostra["autonomia_media"])
+        self.assertIsNotNone(amostra["receita_total_bruta_total"])
+        self.assertIsNotNone(amostra["transferencias_total"])
+        self.assertGreater(amostra["receita_total_bruta_total"], 0)
+        self.assertGreaterEqual(amostra["transferencias_total"], 0)
 
     def test_todos_os_cenarios_preservam_populacao_total(self):
         total_base = sum(linha["populacao"] for linha in self.linhas if linha["ano"] == self.programa["mapa_unificado"]["ano_referencia"])

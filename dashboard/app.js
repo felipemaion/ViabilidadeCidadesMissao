@@ -291,6 +291,15 @@ const elementos = {
   programaAjudaAgrupamentos: document.getElementById("programa-ajuda-agrupamentos"),
   programaAgrupamentosResumo: document.getElementById("programa-agrupamentos-resumo"),
   programaAgrupamentos: document.getElementById("programa-agrupamentos"),
+  programaDetalheTerritorio: document.getElementById("programa-detalhe-territorio"),
+  programaAjudaDetalheTerritorio: document.getElementById("programa-ajuda-detalhe-territorio"),
+  programaDetalheTerritorioSubtitulo: document.getElementById("programa-detalhe-territorio-subtitulo"),
+  programaDetalheTerritorioKpis: document.getElementById("programa-detalhe-territorio-kpis"),
+  programaDetalheMunicipios: document.getElementById("programa-detalhe-municipios"),
+  programaAjudaTabelaMunicipios: document.getElementById("programa-ajuda-tabela-municipios"),
+  programaTabelaMunicipiosHead: document.getElementById("programa-tabela-municipios-head"),
+  programaTabelaMunicipiosBody: document.getElementById("programa-tabela-municipios-body"),
+  programaTabelaMunicipiosFoot: document.getElementById("programa-tabela-municipios-foot"),
   programaSeletorPopulacao: document.getElementById("programa-seletor-populacao"),
   programaSeletorPerfil: document.getElementById("programa-seletor-perfil"),
   programaBuscaTerritorios: document.getElementById("programa-busca-territorios"),
@@ -524,6 +533,7 @@ function renderizarProgramaReforma() {
   sincronizarControlesTabelaPrograma();
   renderizarTabelaMapaUnificado(cenario.territorios);
   renderizarAgrupamentosPrograma(cenario.territorios, cenario);
+  renderizarDetalheTerritorioPrograma(cenario);
   renderizarCenariosPrograma(programa.cenarios_amalgama.municipios_prioritarios);
   renderizarArquiteturaLegal(programa.arquitetura_legal.eixos);
   renderizarCapitaisIfdm(programa.ifdm_capitais || []);
@@ -601,6 +611,30 @@ function atualizarAjudaAgrupamentosPrograma(cenario, perfilAtual) {
     </div>
   `;
   elementos.programaAjudaAgrupamentos.setAttribute("aria-label", texto);
+}
+
+function atualizarAjudaDetalheTerritorioPrograma(cenario, territorio) {
+  if (!elementos.programaAjudaDetalheTerritorio) return;
+  const texto = territorio
+    ? `Este consolidado recompõe o território ${territorio.nome} a partir da soma dos municípios englobados no cenário ${cenario.rotulo}. Percentuais fiscais territoriais, como dependência de transferências, são recalculados com base nos agregados do território, e não por média simples dos municípios.`
+    : "Selecione um território no mapa ou na tabela para ver o consolidado territorial recalculado a partir das somas do agrupamento.";
+  elementos.programaAjudaDetalheTerritorio.dataset.ajuda = texto;
+  elementos.programaAjudaDetalheTerritorio.dataset.ajudaHtml = `
+    <div class="tooltip-ajuda-card">
+      <strong>Consolidado territorial</strong>
+      <p>${escapeHtml(texto)}</p>
+      <div class="tooltip-ajuda-bloco">
+        <span>Como os números são montados</span>
+        <ul>
+          <li>valores monetários do território são somas dos municípios englobados</li>
+          <li>dependência territorial é recalculada como transferências totais divididas pela receita total bruta do território</li>
+          <li>autonomia territorial é recalculada pela razão entre receita sem transferências principais e receita total bruta</li>
+          <li>IFDM e alguns indicadores médios usam ponderação por população para evitar distorção de municípios muito pequenos</li>
+        </ul>
+      </div>
+    </div>
+  `;
+  elementos.programaAjudaDetalheTerritorio.setAttribute("aria-label", texto);
 }
 
 function construirAjudaHtmlPerfil(perfilAtual, cenario) {
@@ -829,6 +863,359 @@ function renderizarAgrupamentosPrograma(territorios, cenario) {
   });
 }
 
+function renderizarDetalheTerritorioPrograma(cenario) {
+  if (!elementos.programaDetalheTerritorioKpis) return;
+  const territorio = (cenario?.territorios || []).find((item) => item.id === estado.territorioProgramaSelecionadoId) || null;
+  atualizarAjudaDetalheTerritorioPrograma(cenario, territorio);
+  elementos.programaDetalheTerritorioKpis.innerHTML = "";
+  elementos.programaDetalheMunicipios.innerHTML = "";
+  if (elementos.programaTabelaMunicipiosHead) elementos.programaTabelaMunicipiosHead.innerHTML = "";
+  if (elementos.programaTabelaMunicipiosBody) elementos.programaTabelaMunicipiosBody.innerHTML = "";
+  if (elementos.programaTabelaMunicipiosFoot) elementos.programaTabelaMunicipiosFoot.innerHTML = "";
+
+  if (!territorio) {
+    elementos.programaDetalheTerritorioSubtitulo.textContent = "Selecione um território no mapa ou na tabela para ver o consolidado.";
+    elementos.programaDetalheMunicipios.innerHTML = '<div class="empty-state">Nenhum território selecionado.</div>';
+    atualizarAjudaTabelaMunicipiosTerritorioPrograma();
+    return;
+  }
+
+  elementos.programaDetalheTerritorioSubtitulo.textContent = `${territorio.nome} · ${territorio.uf} · Perfil ${cenario.perfil_rotulo} · Referência ${formatarInteiro(
+    cenario.populacao_referencia
+  )} hab.`;
+
+  const consolidado = obterConsolidadoTerritorioComTributos(territorio);
+  const explicacoes = obterExplicacoesIndicadoresTerritorio(consolidado);
+  const itens = [
+    ["População agregada", formatarInteiro(consolidado.populacao_total)],
+    ["Municípios englobados", formatarInteiro(consolidado.quantidade_municipios)],
+    ["Dependência territorial recalculada", formatarPercentual(consolidado.dependencia_media, 1)],
+    ["Dependência média simples", formatarPercentual(consolidado.dependencia_media_simples, 1)],
+    ["Autonomia territorial recalculada", formatarPercentual(consolidado.autonomia_media, 1)],
+    ["Autonomia média simples", formatarPercentual(consolidado.autonomia_media_simples, 1)],
+    ["Receita total bruta agregada", formatarMoeda(consolidado.receita_total_bruta_total)],
+    ["Transferências totais", formatarMoeda(consolidado.transferencias_total)],
+    ["Receita tributária agregada", formatarMoeda(consolidado.receita_tributaria_total)],
+    ["Receita própria per capita", formatarMoeda(consolidado.receita_propria_per_capita_territorial)],
+    ["IPTU agregado", formatarMoeda(consolidado.iptu_total)],
+    ["ISS agregado", formatarMoeda(consolidado.iss_total)],
+    ["ITBI agregado", formatarMoeda(consolidado.itbi_total)],
+    ["Despesa total agregada", formatarMoeda(consolidado.despesa_total)],
+    ["Despesa com pessoal", formatarMoeda(consolidado.despesa_pessoal)],
+    ["Capacidade de investimento média", formatarPercentual(consolidado.capacidade_investimento_media, 1)],
+    ["IFDM médio ponderado", formatarNumero(consolidado.ifdm_medio, 3)],
+    ["Bolsa Família total", formatarInteiro(consolidado.bolsa_familia_total)],
+  ];
+
+  itens.forEach(([rotulo, valor]) => {
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = `
+      <dt><span class="rotulo-indicador">${rotulo}${criarBotaoAjudaCompleto(explicacoes[rotulo])}</span></dt>
+      <dd>${valor}</dd>
+    `;
+    elementos.programaDetalheTerritorioKpis.appendChild(wrapper);
+  });
+
+  (territorio._municipiosTexto || "")
+    .split(", ")
+    .filter(Boolean)
+    .forEach((municipio) => {
+      const item = document.createElement("div");
+      item.className = "programa-municipio-chip";
+      item.textContent = municipio;
+      elementos.programaDetalheMunicipios.appendChild(item);
+    });
+
+  renderizarTabelaMunicipiosTerritorioPrograma(territorio, consolidado);
+  carregarTributosTerritorioPrograma(territorio);
+}
+
+function obterLinhasTerritorioPrograma(territorio) {
+  if (!territorio?.municipios?.length) return [];
+  const codigos = new Set(territorio.municipios.map(String));
+  return obterLinhasDoAno().filter((linha) => codigos.has(String(linha.codigo_ibge)));
+}
+
+function obterConsolidadoTerritorioComTributos(territorio) {
+  const linhasTerritorio = obterLinhasTerritorioPrograma(territorio);
+  if (!linhasTerritorio.length) return territorio;
+  const iptuTotal = linhasTerritorio.reduce((soma, linha) => soma + Number(obterTributosMunicipais(linha).iptu ?? linha.IPTU ?? 0), 0);
+  const issTotal = linhasTerritorio.reduce((soma, linha) => soma + Number(obterTributosMunicipais(linha).iss ?? linha.ISS ?? 0), 0);
+  const itbiTotal = linhasTerritorio.reduce((soma, linha) => soma + Number(obterTributosMunicipais(linha).itbi ?? linha.ITBI ?? 0), 0);
+  const receitaTributariaTotal = linhasTerritorio.reduce(
+    (soma, linha) => soma + Number(obterTributosMunicipais(linha).receita_tributaria_municipal ?? linha.receita_tributaria_mun ?? 0),
+    0
+  );
+  return {
+    ...territorio,
+    iptu_total: Number(iptuTotal.toFixed(2)),
+    iss_total: Number(issTotal.toFixed(2)),
+    itbi_total: Number(itbiTotal.toFixed(2)),
+    receita_tributaria_total: Number(receitaTributariaTotal.toFixed(2)),
+    receita_propria_per_capita_territorial: territorio.populacao_total
+      ? Number((receitaTributariaTotal / territorio.populacao_total).toFixed(2))
+      : 0,
+  };
+}
+
+function renderizarTabelaMunicipiosTerritorioPrograma(territorio, consolidado) {
+  if (!elementos.programaTabelaMunicipiosHead || !elementos.programaTabelaMunicipiosBody || !elementos.programaTabelaMunicipiosFoot) return;
+  atualizarAjudaTabelaMunicipiosTerritorioPrograma();
+  const linhasTerritorio = obterLinhasTerritorioPrograma(territorio).sort((a, b) => {
+    const aNome = `${a.nome_municipio || ""} (${a.uf || ""})`;
+    const bNome = `${b.nome_municipio || ""} (${b.uf || ""})`;
+    return aNome.localeCompare(bNome, "pt-BR");
+  });
+
+  const colunas = [
+    {
+      rotulo: "Município",
+      render: (linha) => `${linha.nome_municipio} (${linha.uf})`,
+      classe: "coluna-municipio",
+      tipoCalculo: "Identificação",
+      ajuda: "Linha municipal individual. A última linha resume o território consolidado.",
+    },
+    {
+      rotulo: "População",
+      render: (linha) => formatarInteiro(linha.populacao),
+      tipoCalculo: "Soma",
+      ajuda: "Na linha final, o território usa a soma da população dos municípios englobados.",
+    },
+    {
+      rotulo: "Dependência",
+      render: (linha) => formatarPercentual(linha.pct_dependencia_transf, 1),
+      tipoCalculo: "Recalculo territorial",
+      ajuda:
+        "Na linha final, o território recalcula a dependência como transferências totais agregadas divididas pela receita total bruta agregada. Não é média simples.",
+    },
+    {
+      rotulo: "Autonomia",
+      render: (linha) => formatarNumero(linha.autonomia_fiscal, 1),
+      tipoCalculo: "Recalculo territorial",
+      ajuda:
+        "Na linha final, o território recalcula a autonomia como receita sem transferências principais agregada dividida pela receita total bruta agregada.",
+    },
+    {
+      rotulo: "Receita tributária",
+      render: (linha) => formatarMoeda(obterTributosMunicipais(linha).receita_tributaria_municipal ?? linha.receita_tributaria_mun),
+      tipoCalculo: "Soma",
+      ajuda: "Na linha final, o território usa a soma da receita tributária dos municípios englobados.",
+    },
+    {
+      rotulo: "Rec. própria pc",
+      render: (linha) => formatarMoeda(
+        valorSignificativo(obterTributosMunicipais(linha).receita_tributaria_municipal)
+          ? Number(obterTributosMunicipais(linha).receita_tributaria_municipal) / Number(linha.populacao || 0)
+          : linha.receita_propria_per_capita
+      ),
+      tipoCalculo: "Razão territorial",
+      ajuda:
+        "Na linha final, o território calcula receita tributária agregada dividida pela população agregada. Não é soma nem média simples.",
+    },
+    {
+      rotulo: "IPTU",
+      render: (linha) => formatarMoeda(obterTributosMunicipais(linha).iptu ?? linha.IPTU),
+      tipoCalculo: "Soma",
+      ajuda: "Na linha final, o território usa a soma do IPTU dos municípios. Quando disponível, o painel prioriza a API oficial do Siconfi/Tesouro.",
+    },
+    {
+      rotulo: "ISS",
+      render: (linha) => formatarMoeda(obterTributosMunicipais(linha).iss ?? linha.ISS),
+      tipoCalculo: "Soma",
+      ajuda: "Na linha final, o território usa a soma do ISS dos municípios. Quando disponível, o painel prioriza a API oficial do Siconfi/Tesouro.",
+    },
+    {
+      rotulo: "ITBI",
+      render: (linha) => formatarMoeda(obterTributosMunicipais(linha).itbi ?? linha.ITBI),
+      tipoCalculo: "Soma",
+      ajuda: "Na linha final, o território usa a soma do ITBI dos municípios. Quando disponível, o painel prioriza a API oficial do Siconfi/Tesouro.",
+    },
+    {
+      rotulo: "IFDM",
+      render: (linha) => formatarNumero(linha.ifdm_geral, 3),
+      tipoCalculo: "Média ponderada",
+      ajuda: "Na linha final, o território usa o IFDM médio ponderado pela população dos municípios englobados.",
+    },
+    {
+      rotulo: "Bolsa Família",
+      render: (linha) => formatarInteiro(linha.bolsa_familia_total),
+      tipoCalculo: "Soma",
+      ajuda: "Na linha final, o território usa a soma dos benefícios do Bolsa Família dos municípios englobados.",
+    },
+  ];
+
+  elementos.programaTabelaMunicipiosHead.innerHTML = `
+    <tr>
+      ${colunas
+        .map(
+          (coluna) =>
+            `<th class="${coluna.classe || ""}"><span class="rotulo-indicador">${coluna.rotulo}${criarBotaoAjuda(
+              coluna.ajuda
+            )}</span></th>`
+        )
+        .join("")}
+    </tr>
+    <tr class="programa-tabela-municipios-tipo">
+      ${colunas.map((coluna) => `<th class="${coluna.classe || ""}">${coluna.tipoCalculo}</th>`).join("")}
+    </tr>
+  `;
+
+  elementos.programaTabelaMunicipiosBody.innerHTML = linhasTerritorio
+    .map(
+      (linha) => `
+        <tr>
+          ${colunas
+            .map((coluna) => `<td class="${coluna.classe || ""}">${coluna.render(linha)}</td>`)
+            .join("")}
+        </tr>
+      `
+    )
+    .join("");
+
+  elementos.programaTabelaMunicipiosFoot.innerHTML = `
+    <tr>
+      <th class="coluna-municipio">Território consolidado</th>
+      <th>${formatarInteiro(consolidado.populacao_total)}</th>
+      <th>${formatarPercentual(consolidado.dependencia_media, 1)}</th>
+      <th>${formatarPercentual(consolidado.autonomia_media, 1)}</th>
+      <th>${formatarMoeda(consolidado.receita_tributaria_total)}</th>
+      <th>${formatarMoeda(consolidado.receita_propria_per_capita_territorial)}</th>
+      <th>${formatarMoeda(consolidado.iptu_total)}</th>
+      <th>${formatarMoeda(consolidado.iss_total)}</th>
+      <th>${formatarMoeda(consolidado.itbi_total)}</th>
+      <th>${formatarNumero(consolidado.ifdm_medio, 3)}</th>
+      <th>${formatarInteiro(consolidado.bolsa_familia_total)}</th>
+    </tr>
+  `;
+}
+
+function atualizarAjudaTabelaMunicipiosTerritorioPrograma() {
+  if (!elementos.programaAjudaTabelaMunicipios) return;
+  const texto =
+    "Cada linha mostra um município do território selecionado. A última linha mostra o consolidado territorial: somas para valores monetários e Bolsa Família, soma de população, IFDM ponderado pela população e indicadores territoriais recalculados para dependência e autonomia.";
+  const html = `
+    <strong>Como ler esta tabela</strong>
+    <p>Cada linha corresponde a um município do território selecionado no mapa ou na tabela lateral.</p>
+    <p>A última linha, <strong>Território</strong>, mostra o resultado consolidado do agrupamento.</p>
+    <p><strong>Somas</strong>: população, receita tributária, IPTU, ISS, ITBI e Bolsa Família.</p>
+    <p><strong>Recalculo territorial</strong>: dependência e autonomia usam os agregados do território, e não média simples.</p>
+    <p><strong>Média ponderada</strong>: IFDM usa ponderação pela população dos municípios.</p>
+  `;
+  elementos.programaAjudaTabelaMunicipios.dataset.ajuda = texto;
+  elementos.programaAjudaTabelaMunicipios.dataset.ajudaHtml = html;
+  elementos.programaAjudaTabelaMunicipios.setAttribute("aria-label", texto);
+}
+
+function obterExplicacoesIndicadoresTerritorio(territorio) {
+  const fonteBase = "Base principal consolidada: 07.03_indicadores_base_completa_20260217.xlsx.";
+  const fonteTributos = "Tributos municipais priorizam a integração oficial com Siconfi/Tesouro; no consolidado territorial, o painel soma os valores disponíveis no dataset consolidado do cenário.";
+  const fonteSocial = "Bolsa Família vem da base específica de benefícios por município; IFDM vem do ranking oficial da FIRJAN e é ponderado pela população.";
+  const ajuda = (texto, html) => ({ texto, html });
+  return {
+    "População agregada": ajuda("Soma da população dos municípios englobados no território.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma da população dos municípios englobados no território selecionado.</p>
+      <p>${fonteBase}</p>
+    `),
+    "Municípios englobados": ajuda("Quantidade de municípios incorporados ao território no cenário atual.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Contagem de municípios incorporados ao território no cenário e perfil atualmente selecionados.</p>
+      <p>Não é média: é a quantidade institucional do agrupamento.</p>
+    `),
+    "Dependência territorial recalculada": ajuda("Transferências totais agregadas divididas pela receita total bruta agregada.", `
+      <strong>Memorial de cálculo</strong>
+      <p><code>transferências totais agregadas / receita total bruta agregada</code>.</p>
+      <p>Este é o indicador territorial tecnicamente mais representativo, porque recalcula a dependência a partir dos agregados do território, em vez de tratar todos os municípios com o mesmo peso.</p>
+      <p>${fonteBase}</p>
+    `),
+    "Dependência média simples": ajuda("Média aritmética simples dos percentuais municipais de dependência.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Média aritmética simples dos percentuais municipais de dependência.</p>
+      <p>Serve como comparação metodológica, mas pode distorcer a leitura quando um município muito pequeno tem peso igual a um município grande.</p>
+    `),
+    "Autonomia territorial recalculada": ajuda("Receita territorial sem transferências principais dividida pela receita total bruta agregada.", `
+      <strong>Memorial de cálculo</strong>
+      <p><code>receita sem transferências principais agregada / receita total bruta agregada</code>.</p>
+      <p>Assim como a dependência territorial, esta leitura é recalculada no nível do território consolidado.</p>
+      <p>${fonteBase}</p>
+    `),
+    "Autonomia média simples": ajuda("Média aritmética simples da autonomia fiscal municipal.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Média aritmética simples do indicador municipal de autonomia fiscal.</p>
+      <p>É mantida no painel para comparação, mas não substitui a autonomia territorial recalculada.</p>
+    `),
+    "Receita total bruta agregada": ajuda("Soma da receita total bruta dos municípios do território.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma da receita total bruta dos municípios englobados.</p>
+      <p>É a base usada para recalcular indicadores territoriais como dependência, autonomia e participação tributária.</p>
+      <p>${fonteBase}</p>
+    `),
+    "Transferências totais": ajuda("Soma das transferências principais dos municípios englobados.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma das transferências correntes principais dos municípios do território.</p>
+      <p>Entra diretamente no cálculo da dependência territorial recalculada.</p>
+      <p>${fonteBase}</p>
+    `),
+    "Receita tributária agregada": ajuda("Soma da receita tributária municipal dos municípios englobados.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma da receita tributária municipal dos municípios englobados.</p>
+      <p>Ajuda a medir a capacidade arrecadatória própria do território.</p>
+      <p>${fonteBase}</p>
+    `),
+    "Receita própria per capita": ajuda("Receita tributária agregada dividida pela população agregada.", `
+      <strong>Memorial de cálculo</strong>
+      <p><code>receita tributária agregada / população agregada</code>.</p>
+      <p>Mostra quanto de arrecadação própria o território gera por habitante.</p>
+      <p>${fonteBase}</p>
+    `),
+    "IPTU agregado": ajuda("Soma do IPTU dos municípios englobados.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma do IPTU dos municípios englobados.</p>
+      <p>${fonteTributos}</p>
+    `),
+    "ISS agregado": ajuda("Soma do ISS dos municípios englobados.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma do ISS dos municípios englobados.</p>
+      <p>${fonteTributos}</p>
+    `),
+    "ITBI agregado": ajuda("Soma do ITBI dos municípios englobados.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma do ITBI dos municípios englobados.</p>
+      <p>${fonteTributos}</p>
+    `),
+    "Despesa total agregada": ajuda("Soma da despesa total dos municípios englobados.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma da despesa total dos municípios do território.</p>
+      <p>Permite comparar o porte orçamentário territorial com a receita agregada.</p>
+      <p>${fonteBase}</p>
+    `),
+    "Despesa com pessoal": ajuda("Soma da despesa com pessoal dos municípios englobados.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma da despesa com pessoal dos municípios englobados.</p>
+      <p>É um sinal importante de rigidez orçamentária e pressão fiscal.</p>
+      <p>${fonteBase}</p>
+    `),
+    "Capacidade de investimento média": ajuda("Média ponderada pela população da capacidade de investimento municipal.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Média ponderada pela população do indicador municipal de capacidade de investimento.</p>
+      <p>Ajuda a comparar o potencial de investimento do território sem tratar todos os municípios como iguais.</p>
+      <p>${fonteBase}</p>
+    `),
+    "IFDM médio ponderado": ajuda("Média do IFDM ponderada pela população dos municípios englobados.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Média do IFDM ponderada pela população dos municípios englobados.</p>
+      <p>Territórios com municípios maiores têm peso maior no resultado final.</p>
+      <p>${fonteSocial}</p>
+    `),
+    "Bolsa Família total": ajuda("Soma dos benefícios do Bolsa Família dos municípios do território.", `
+      <strong>Memorial de cálculo</strong>
+      <p>Soma dos benefícios do Bolsa Família no recorte municipal que compõe o território.</p>
+      <p>Funciona como proxy adicional de vulnerabilidade social no cenário selecionado.</p>
+      <p>${fonteSocial}</p>
+    `),
+  };
+}
+
 function sincronizarControlesTabelaPrograma() {
   elementos.programaBuscaTerritorios.value = estado.buscaTerritoriosPrograma;
 }
@@ -882,6 +1269,7 @@ function selecionarTerritorioPrograma(territorioId) {
   renderizarMapaUnificadoPrograma(territorios);
   renderizarTabelaMapaUnificado(territorios);
   renderizarAgrupamentosPrograma(territorios, obterCenarioProgramaAtivo());
+  renderizarDetalheTerritorioPrograma(obterCenarioProgramaAtivo());
   requestAnimationFrame(() => {
     focarTerritorioProgramaNoMapa(territorioId);
     const linha = elementos.programaTabelaTerritorios.querySelector(`tr[data-territorio-id="${territorioId}"]`);
@@ -923,6 +1311,7 @@ function aplicarBuscaTerritoriosPrograma(termo) {
   const cenario = obterCenarioProgramaAtivo();
   renderizarTabelaMapaUnificado(territorios);
   renderizarAgrupamentosPrograma(territorios, cenario);
+  renderizarDetalheTerritorioPrograma(cenario);
 }
 
 function renderizarArquiteturaLegal(eixos) {
@@ -1291,6 +1680,7 @@ function registrarEventos() {
       const cenario = obterCenarioProgramaAtivo();
       renderizarTabelaMapaUnificado(territorios);
       renderizarAgrupamentosPrograma(territorios, cenario);
+      renderizarDetalheTerritorioPrograma(cenario);
     });
   });
   elementos.programaPaginaAnterior.addEventListener("click", () => {
@@ -1299,6 +1689,7 @@ function registrarEventos() {
     const cenario = obterCenarioProgramaAtivo();
     renderizarTabelaMapaUnificado(territorios);
     renderizarAgrupamentosPrograma(territorios, cenario);
+    renderizarDetalheTerritorioPrograma(cenario);
   });
   elementos.programaPaginaProxima.addEventListener("click", () => {
     estado.paginaTerritoriosPrograma += 1;
@@ -1306,6 +1697,7 @@ function registrarEventos() {
     const cenario = obterCenarioProgramaAtivo();
     renderizarTabelaMapaUnificado(territorios);
     renderizarAgrupamentosPrograma(territorios, cenario);
+    renderizarDetalheTerritorioPrograma(cenario);
   });
   elementos.buscaMunicipioInput.addEventListener("input", (evento) => {
     const termo = evento.target.value || "";
@@ -1607,6 +1999,7 @@ function aplicarAcaoControleMapa(chaveMapa, acao) {
       renderizarMapaUnificadoPrograma(territorios);
       renderizarTabelaMapaUnificado(territorios);
       renderizarAgrupamentosPrograma(territorios, cenario);
+      renderizarDetalheTerritorioPrograma(cenario);
       return;
     }
     transform.escala = 1;
@@ -1798,8 +2191,13 @@ function obterTributosMunicipais(linha) {
 }
 
 async function carregarTributosMunicipais(linha) {
+  return carregarTributosMunicipaisComCallback(linha);
+}
+
+async function carregarTributosMunicipaisComCallback(linha, aoAtualizar = null) {
   const chave = obterChaveTributos(linha);
-  if (estado.cacheTributosMunicipais[chave]?.fonte) return;
+  if (estado.cacheTributosMunicipais[chave]?.fonte || estado.cacheTributosMunicipais[chave]?.carregando) return;
+  estado.cacheTributosMunicipais[chave] = { carregando: true };
   estado.chaveTributosAtiva = chave;
 
   try {
@@ -1809,6 +2207,9 @@ async function carregarTributosMunicipais(linha) {
     }
     const payload = await resposta.json();
     estado.cacheTributosMunicipais[chave] = payload;
+    if (typeof aoAtualizar === "function") {
+      aoAtualizar(payload);
+    }
     if (estado.chaveTributosAtiva === chave && estado.codigoSelecionado === linha.codigo_ibge && String(estado.anoAtual) === String(linha.ano)) {
       renderizarDetalhe(linha, obterLinhasFiltradas());
     }
@@ -1817,7 +2218,22 @@ async function carregarTributosMunicipais(linha) {
       fonte: "Base financeira principal consolidada",
       erro_api_tributos: String(erro.message || erro),
     };
+    if (typeof aoAtualizar === "function") {
+      aoAtualizar(estado.cacheTributosMunicipais[chave]);
+    }
   }
+}
+
+function carregarTributosTerritorioPrograma(territorio) {
+  const linhasTerritorio = obterLinhasTerritorioPrograma(territorio);
+  if (!linhasTerritorio.length) return;
+  linhasTerritorio.forEach((linha) => {
+    carregarTributosMunicipaisComCallback(linha, () => {
+      const cenario = obterCenarioProgramaAtivo();
+      if (!cenario || estado.territorioProgramaSelecionadoId !== territorio.id) return;
+      renderizarDetalheTerritorioPrograma(cenario);
+    });
+  });
 }
 
 function renderizarRanking(linhas) {
@@ -2209,6 +2625,18 @@ function criarBotaoAjuda(textoAjuda) {
   return `<button class="ajuda-indicador" type="button" data-ajuda="${escapeHtml(textoAjuda)}" aria-label="${escapeHtml(textoAjuda)}">?</button>`;
 }
 
+function criarBotaoAjudaCompleto(configuracaoAjuda) {
+  if (!configuracaoAjuda) {
+    return criarBotaoAjuda("Indicador mostrado com base nas fontes e filtros atuais do painel.");
+  }
+  if (typeof configuracaoAjuda === "string") {
+    return criarBotaoAjuda(configuracaoAjuda);
+  }
+  const texto = configuracaoAjuda.texto || "Indicador mostrado com base nas fontes e filtros atuais do painel.";
+  const html = configuracaoAjuda.html || "";
+  return `<button class="ajuda-indicador" type="button" data-ajuda="${escapeHtml(texto)}" data-ajuda-html="${escapeHtml(html)}" aria-label="${escapeHtml(texto)}">?</button>`;
+}
+
 function escapeHtml(texto) {
   return String(texto)
     .replace(/&/g, "&amp;")
@@ -2288,6 +2716,11 @@ function formatarMoeda(valor) {
     currency: "BRL",
     maximumFractionDigits: 0,
   }).format(Number(valor));
+}
+
+function formatarPercentual(valor, casas = 1) {
+  if (!valorSignificativo(valor)) return "Sem dado";
+  return `${formatarNumero(valor, casas)}%`;
 }
 
 function formatarMes(valor) {
