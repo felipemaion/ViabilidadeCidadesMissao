@@ -45,7 +45,8 @@ npm run build-site
 - Vercel:
   - o arquivo [`vercel.json`](/Users/maion/Projects/CidadesMissao/vercel.json) ja esta pronto
   - a Vercel passa a gerar a pasta [`dist/`](/Users/maion/Projects/CidadesMissao/dist) no build
-  - o artefato [`dashboard/data/programa_reforma.json`](/Users/maion/Projects/CidadesMissao/dashboard/data/programa_reforma.json) e reconstruido no deploy a partir dos JSONs versionados em [`dashboard/data/`](/Users/maion/Projects/CidadesMissao/dashboard/data)
+  - no deploy remoto, ela roda apenas a reconstrucao de [`dashboard/data/programa_reforma.json`](/Users/maion/Projects/CidadesMissao/dashboard/data/programa_reforma.json) e o empacotamento estatico
+  - a etapa [`build-data`] depende das bases brutas locais e por isso continua sendo um passo de reconstrucao local
 
 ### O que sera publicado
 
