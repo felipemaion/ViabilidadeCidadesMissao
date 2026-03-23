@@ -445,9 +445,77 @@ def normalize_edge(a, b):
     return edge if edge[0] <= edge[1] else (edge[1], edge[0])
 
 
+def parse_svg_rings(path_data):
+    tokens = re.findall(r"[MLZ]|-?\d+(?:\.\d+)?", path_data or "")
+    rings = []
+    current = []
+    idx = 0
+    command = None
+    while idx < len(tokens):
+        token = tokens[idx]
+        if token in {"M", "L", "Z"}:
+            command = token
+            idx += 1
+            if command == "Z" and current:
+                if current[0] != current[-1]:
+                    current.append(current[0])
+                if len(current) >= 4:
+                    rings.append(current)
+                current = []
+            continue
+        if command in {"M", "L"} and idx + 1 < len(tokens):
+            point = (float(tokens[idx]), float(tokens[idx + 1]))
+            current.append(point)
+            idx += 2
+            continue
+        idx += 1
+    if current:
+        if current[0] != current[-1]:
+            current.append(current[0])
+        if len(current) >= 4:
+            rings.append(current)
+    return rings
+
+
+def build_adjacency_map_from_svg_paths(codes_by_uf=None):
+    mapa = load_json(MAPA_PATH)
+    ano = str(max(int(key) for key in mapa))
+    records = mapa[ano]
+    if codes_by_uf is None:
+        codes_by_uf = {}
+    code_to_uf = {code: uf for uf, codes in codes_by_uf.items() for code in codes}
+    allowed_codes = set(code_to_uf) if code_to_uf else None
+    records = [item for item in records if allowed_codes is None or item["codigo_ibge"] in allowed_codes]
+
+    edge_index = {}
+    adjacency = {}
+    for item in records:
+        code = item["codigo_ibge"]
+        uf = code_to_uf.get(code)
+        if codes_by_uf and uf and code not in codes_by_uf.get(uf, set()):
+            continue
+        rings = parse_svg_rings(item.get("caminho_svg", ""))
+        adjacency.setdefault(code, set())
+        for ring in rings:
+            for idx in range(len(ring) - 1):
+                edge = normalize_edge(ring[idx], ring[idx + 1])
+                edge_index.setdefault(edge, []).append(code)
+
+    for members in edge_index.values():
+        unique_members = sorted(set(members))
+        if len(unique_members) < 2:
+            continue
+        for code in unique_members:
+            adjacency.setdefault(code, set()).update(other for other in unique_members if other != code)
+    return adjacency
+
+
 def build_adjacency_map(codes_by_uf=None):
     builder = load_dashboard_builder()
-    features, _ = builder.read_shapefile(builder.BOUNDARY_ZIP)
+    if builder.BOUNDARY_ZIP.exists():
+        features, _ = builder.read_shapefile(builder.BOUNDARY_ZIP)
+    else:
+        return build_adjacency_map_from_svg_paths(codes_by_uf)
     if codes_by_uf is None:
       codes_by_uf = {}
     allowed_codes = set().union(*codes_by_uf.values()) if codes_by_uf else None

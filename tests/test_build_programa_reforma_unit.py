@@ -153,3 +153,10 @@ class TestBuildProgramaReformaUnit(unittest.TestCase):
         self.assertAlmostEqual(250.0 / 1100.0 * 100, agregado["dependencia_media"], places=3)
         self.assertAlmostEqual(850.0 / 1100.0 * 100, agregado["autonomia_media"], places=3)
         self.assertEqual(35.0, agregado["dependencia_media_simples"])
+
+    def test_parse_svg_rings_recupera_anel_fechado(self):
+        rings = self.builder_programa.parse_svg_rings("M 0 0 L 10 0 L 10 10 L 0 10 Z")
+        self.assertEqual(1, len(rings))
+        self.assertEqual((0.0, 0.0), rings[0][0])
+        self.assertEqual((0.0, 0.0), rings[0][-1])
+        self.assertEqual(5, len(rings[0]))
