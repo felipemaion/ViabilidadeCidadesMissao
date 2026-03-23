@@ -6,6 +6,6 @@
     "build-programa": "python3 scripts/build_programa_reforma.py",
     "preparar-publicacao": "python3 scripts/prepare_static_publish.py",
     "serve": "python3 scripts/serve_dashboard.py",
-    "test": "python3 -m unittest discover -s tests -v"
+    "test": "python3 -m unittest discover -s tests -v && node --test tests/test_api_tributos.mjs"
   }
 }

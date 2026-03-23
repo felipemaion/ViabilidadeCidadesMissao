@@ -1,0 +1,69 @@
+name = "cidades-missao"
+shell = "zsh"
+
+[project]
+description = "Dashboard local e publicado de viabilidade municipal, programa de reforma territorial, climatologia e integração de bases fiscais e sociais."
+primary_stack = ["python", "javascript", "html", "css"]
+entrypoints = [
+  "config.toml",
+  "dashboard/index.html",
+  "dashboard/app.js",
+  "dashboard/styles.css",
+  "scripts/build_dashboard_data.py",
+  "scripts/build_programa_reforma.py",
+  "scripts/prepare_static_publish.py",
+  "scripts/serve_dashboard.py",
+  "api/tributos.js",
+  "tests/test_dashboard_sistema.py",
+  "tests/test_serve_dashboard.py",
+  "tests/test_publish.py",
+  "tests/test_build_programa_reforma_unit.py",
+  "tests/test_api_tributos.mjs"
+]
+
+[commands]
+test = "npm run test"
+build_data = "npm run build-data"
+build_programa = "npm run build-programa"
+preparar_publicacao = "npm run preparar-publicacao"
+serve = "npm run serve"
+
+[testing]
+default = "npm run test"
+python = "python3 -m unittest discover -s tests -v"
+node_api = "node --test tests/test_api_tributos.mjs"
+quick = [
+  "node --check dashboard/app.js",
+  "python3 -m py_compile scripts/build_dashboard_data.py",
+  "python3 -m py_compile scripts/build_programa_reforma.py",
+  "python3 -m py_compile scripts/serve_dashboard.py"
+]
+
+[paths]
+dashboard = "dashboard"
+data = "dashboard/data"
+raw_sources = "data/fontes"
+raw_geo = "data/raw"
+tests = "tests"
+scripts = "scripts"
+api = "api"
+dist = "dist"
+
+[conventions]
+language = "pt-BR"
+prefer_apply_patch = true
+prefer_rg = true
+prefer_non_interactive_git = true
+run_tests_after_changes = true
+avoid_destructive_git = true
+keep_ui_text_in_portuguese = true
+
+[git]
+main_branch = "main"
+remote = "origin"
+auto_commit = false
+auto_push = false
+
+require_tests_for_code_changes = true
+prefer_behavioral_tests = true
+protect_generated_data = true

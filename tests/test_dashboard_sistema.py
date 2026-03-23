@@ -147,6 +147,20 @@ class TestFuncoesDoBuilder(BaseDashboardTest):
         self.assertEqual("202602", referencia)
         self.assertEqual(referencia, bolsa["110001"]["referencia_bolsa_familia"])
 
+    def test_normalize_text_do_programa_remove_acentos_e_normaliza(self):
+        self.assertEqual(
+            "sao jose do rio preto sp",
+            self.builder_programa.normalize_text(" São José do Rio Preto (SP) "),
+        )
+
+    def test_status_predominante_do_programa_respeita_maioria(self):
+        linhas = [
+            {"status_viabilidade": "INVIAVEL"},
+            {"status_viabilidade": "INVIAVEL"},
+            {"status_viabilidade": "CRITICA"},
+        ]
+        self.assertEqual("INVIAVEL", self.builder_programa.status_predominante(linhas))
+
 
 class TestContratosDosArtefatos(BaseDashboardTest):
     def test_arquivos_gerados_existem(self):
