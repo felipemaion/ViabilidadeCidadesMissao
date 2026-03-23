@@ -781,6 +781,7 @@ select {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.62);
   margin-top: 16px;
+  overflow: hidden;
 }
 
 .busca-municipio-box {
@@ -1215,12 +1216,21 @@ select {
 
 .programa-tabela-municipios-wrap {
   max-height: 420px;
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(24, 36, 31, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .programa-tabela-municipios {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
-  min-width: 980px;
+  min-width: 1120px;
   font-size: 0.84rem;
 }
 
@@ -1292,12 +1302,19 @@ select {
   }
 
   .hero-stats,
-  .filters,
   .metrica-resumo,
   .charts-grid,
   .programa-agrupamentos-grid,
   .cartilhas-grid {
     grid-template-columns: 1fr;
+  }
+
+  .hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters {
+    grid-template-columns: repeat(2, minmax(128px, 1fr));
   }
 
   .detail-grid-programa {
@@ -1307,9 +1324,69 @@ select {
   .explorer-layout {
     grid-template-columns: 1fr;
   }
+
+  .detail-grid,
+  .comparacao-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .page-shell {
+    width: min(100vw - 20px, 1480px);
+    padding-top: 18px;
+  }
+
+  .hero-copy,
+  .hero-stats,
+  .panel {
+    border-radius: 24px;
+  }
+
+  .hero-copy,
+  .panel {
+    padding: 18px;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .programa-mapa-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .programa-tabela-coluna {
+    min-width: 0;
+  }
+
+  .map-frame,
+  .map-frame-clima,
+  .map-frame-programa {
+    border-radius: 22px;
+  }
+
+  .metrica-card h3 {
+    font-size: 1.02rem;
+  }
+
+  .programa-tabela-municipios {
+    min-width: 960px;
+    font-size: 0.8rem;
+  }
 }
 
 @media (max-width: 720px) {
+  .hero-stats {
+    grid-template-columns: 1fr;
+  }
+
   .filters-programa-mapa {
     grid-template-columns: 1fr;
   }
@@ -1345,13 +1422,32 @@ select {
 
 @media (max-width: 720px) {
   .page-shell {
-    width: min(100vw - 18px, 1480px);
+    width: min(100vw - 12px, 1480px);
     padding-top: 14px;
   }
 
   .hero-copy,
   .panel {
-    padding: 18px;
+    padding: 14px;
+  }
+
+  .hero-copy,
+  .hero-stats,
+  .panel {
+    border-radius: 20px;
+  }
+
+  h1 {
+    font-size: 1.85rem;
+    line-height: 1.02;
+  }
+
+  h2 {
+    font-size: 1.7rem;
+  }
+
+  .metrica-card {
+    padding: 14px;
   }
 
   .detail-grid,
@@ -1375,5 +1471,64 @@ select {
   .map-controls .botao-mapa {
     min-width: 38px;
     min-height: 38px;
+  }
+
+  .legenda-mapa-sobreposta {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: auto;
+    max-width: calc(100% - 20px);
+  }
+
+  .sidebar-block {
+    padding: 8px;
+  }
+
+  .busca-municipio-label {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .busca-municipio-label input {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .detail-grid dt {
+    font-size: 0.66rem;
+  }
+
+  .detail-grid dd {
+    font-size: 0.88rem;
+  }
+
+  .programa-tabela-municipios-wrap {
+    max-height: 360px;
+    border-radius: 14px;
+  }
+
+  .programa-tabela-municipios {
+    min-width: 840px;
+    font-size: 0.76rem;
+  }
+
+  .programa-tabela-municipios th,
+  .programa-tabela-municipios td {
+    padding: 8px 10px;
+  }
+
+  .programa-tabela-municipios thead th {
+    font-size: 0.66rem;
+  }
+
+  .programa-tabela-municipios thead .programa-tabela-municipios-tipo th {
+    top: 34px;
+    font-size: 0.62rem;
+  }
+
+  .programa-tabela-municipios .coluna-municipio {
+    min-width: 150px;
   }
 }
